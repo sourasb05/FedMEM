@@ -1,0 +1,4 @@
+Box no: x_left x_right y_top y_bottom
+Box 1: (11 64 879 941) 
+Box 2: (565 722 642 863) 
+Box 3: (119 142 891 918) 

@@ -1,0 +1,3 @@
+Box no: x_left x_right y_top y_bottom
+Box 1: (196 325 553 697) 
+Box 2: (703 824 619 768) 

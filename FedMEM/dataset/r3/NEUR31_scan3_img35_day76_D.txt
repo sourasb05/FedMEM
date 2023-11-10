@@ -1,0 +1,4 @@
+Box no: x_left x_right y_top y_bottom
+Box 1: (490 503 1157 1174) 
+Box 2: (53 111 1140 1198) 
+Box 3: (681 715 1134 1192) 
