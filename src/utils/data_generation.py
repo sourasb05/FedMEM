@@ -71,16 +71,18 @@ def generate_list_with_sum(n, total_sum, min_value, max_value):
 
     return elements
 
-def load_data(data_dir, csv_file):
+def load_data(current_directory):
 
-# Create a transform to resize and normalize the images
+    data_dir = current_directory + "/dataset/r3_refined"
+    csv_file = current_directory + "/dataset/refined_training_file.csv"
+    # Create a transform to resize and normalize the images
     transform = transforms.Compose([
         transforms.Resize(32),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-# Create a Dataset object
+    # Create a Dataset object
     dataset = MyDataset(data_dir, csv_file, transform)
 
     images = []
@@ -94,7 +96,7 @@ def load_data(data_dir, csv_file):
             print(f"images[{i}] is a tensor.")
         else:
             print(f"images[{i}] is not a tensor.")
-   """
+    """
     # input("press")
     n = len(images)
     print("number of images:", n)
@@ -107,8 +109,8 @@ def load_data(data_dir, csv_file):
     NUM_USERS = 10 
 
     # Setup directory for train/test data
-    train_path = './FedMEM/dataset/train/fedr3_train.json'
-    test_path = './FedMEM/dataset/test/fedr3_test.json'
+    train_path = current_directory +'/FedMEM_dataset/train/fedr3_train.json'
+    test_path = current_directory +'/FedMEM_dataset/test/fedr3_test.json'
     dir_path = os.path.dirname(train_path)
     if not os.path.exists(dir_path):
        os.makedirs(dir_path)
@@ -195,10 +197,3 @@ def load_data(data_dir, csv_file):
         json.dump(test_data, outfile)
 
     print("Finish Generating Samples")
-
-
-
-data_dir = "/proj/sourasb-220503/FedMEM_new/FedMEM/dataset/r3_refined"
-
-csv_file = "/proj/sourasb-220503/FedMEM_new/FedMEM/dataset/refined_training_file.csv"
-load_data(data_dir, csv_file)
