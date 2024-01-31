@@ -5,10 +5,10 @@ Download the train and test file in json format from [here](https://drive.google
 
 FedMEM_dataset/
 
-├── train/
+      ├── train/
 
-      ├── fedr3_train.json
+            ├── fedr3_train.json
       
-├── tests/
+      ├── tests/
       
-      └── fedre_test.json
+            └── fedre_test.json
