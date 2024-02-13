@@ -2,6 +2,7 @@ from src.Fedavg.FedAvgServer import FedAvg
 from src.PerMFL.PerMFLServer import PerMFL
 from src.Fedmem.FedMEMServer import Fedmem
 from src.FeSEM.FeSEM_server import FeSEM
+#from src.DemLearn.FLAlgorithms.servers.serverDemLearn import DemLearn
 # from src.Optimizer.Optimizer import PerMFL
 from src.TrainModels.trainmodels import *
 from src.utils.data_process import read_data
@@ -49,6 +50,8 @@ def main(args):
                 server = Fedmem(device, model, args, i, current_directory)
             elif args.algorithm == "FeSEM":
                 server = FeSEM(device, args, i, current_directory)
+            # elif args.algorithm == "DemLearn":
+            #    server = DemLearn(device, args, i , current_directory)
             
         except ValueError:
             raise ValueError("Wrong algorithm selected")

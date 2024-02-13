@@ -15,10 +15,10 @@ import time
 
 
 class MyDataset(Dataset):
-    def __init__(self, data_dir, csv_file, transform):
+    def __init__(self, data_dir, csv_file): # .transform
         self.data_dir = data_dir
         self.csv_file = csv_file
-        self.transform = transform
+        # self.transform = transform
         
         self.data = []
         self.target = []
@@ -30,6 +30,8 @@ class MyDataset(Dataset):
             for row in reader:
                 self.data.append(os.path.join(data_dir, row[0]))
                 self.target.append(int(row[1]))
+            # print(self.data)
+            # print(self.target)
            
            
            # self.labels = [line.strip().split(",")[1] for line in f]
@@ -42,9 +44,9 @@ class MyDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        image = Image.open(self.data[idx])
-        if self.transform is not None:
-            image = self.transform(image)
+        image = torch.load(self.data[idx])
+        #if self.transform is not None:
+        #    image = self.transform(image)
         
         # Convert the image to a PyTorch tensor
         # image = torch.from_numpy(np.array(image))
@@ -71,25 +73,29 @@ def generate_list_with_sum(n, total_sum, min_value, max_value):
 
     return elements
 
-def load_data(current_directory):
-
-    data_dir = current_directory + "/dataset/r3_refined"
-    csv_file = current_directory + "/dataset/refined_training_file.csv"
+def load_data(current_directory, data_div):
+    print("at load data")
+    data_dir = current_directory + "/dataset/r3_mem_ResNet50FC_features"
+    csv_file = current_directory + "/dataset/tensor_training_file.csv"
     # Create a transform to resize and normalize the images
-    transform = transforms.Compose([
+    """transform = transforms.Compose([
         transforms.Resize(32),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
-
+"""
     # Create a Dataset object
-    dataset = MyDataset(data_dir, csv_file, transform)
+    dataset = MyDataset(data_dir, csv_file)
 
     images = []
     targets = []
     for image, target in dataset:
         images.append(image.cpu().detach().numpy())
         targets.append(target)
+
+    #print(images)
+    #input("press")
+    #print(targets)
     
     """for i, image in enumerate(images):
         if isinstance(image, torch.Tensor):  # Check if it's a PyTorch tensor
@@ -106,7 +112,7 @@ def load_data(current_directory):
 
     random.seed(1)
     np.random.seed(1)
-    NUM_USERS = 10 
+    NUM_USERS = 20
 
     # Setup directory for train/test data
     train_path = current_directory +'/FedMEM_dataset/train/fedr3_train.json'
@@ -117,7 +123,7 @@ def load_data(current_directory):
     dir_path = os.path.dirname(test_path)
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
-    data_div = "unequal"
+    
     if data_div == "equal":
         
         m = np.ones(NUM_USERS, dtype=int) * int(n/NUM_USERS)
@@ -135,11 +141,11 @@ def load_data(current_directory):
             y[user] += targets[lb:lb+m[user]]
             lb = lb+m[user]
 
-    else: 
+    elif data_div == "unequal": 
         if NUM_USERS < 2:
             raise ValueError("Size must be greater than 1.")
 
-        unequal_parts = generate_list_with_sum(NUM_USERS,n, min_value=1000, max_value=4000)
+        unequal_parts = generate_list_with_sum(NUM_USERS,n, min_value=500, max_value=4000)
 
         
         print(unequal_parts)
@@ -157,7 +163,72 @@ def load_data(current_directory):
             y[user] += targets[lb:lb+unequal_parts[user]]
             lb = lb+unequal_parts[user]
         
-    
+    elif data_div == "n_iid": 
+        print("at n_iid div")
+        NUM_LABELS = 2
+        if NUM_USERS < 2:
+            raise ValueError("Size must be greater than 1.")
+        data = []
+        print(targets)
+        input("press")
+        for i in trange(10):
+            idx = targets == i
+            print(idx)
+            data.append(images[idx])
+            print(len(data))
+
+        print("\nNumb samples of each label:\n", [len(v) for v in data])
+        users_lables = []
+
+
+        ###### CREATE USER DATA SPLIT #######
+        # Assign 100 samples to each user
+        X = [[] for _ in range(NUM_USERS)]
+        y = [[] for _ in range(NUM_USERS)]
+        idx = np.zeros(10, dtype=np.int64)
+        for user in range(NUM_USERS):
+            for j in range(NUM_LABELS):  # 2 labels for each users
+                #l = (2*user+j)%10
+                l = (user + j) % 10
+                print("L:", l)
+                X[user] += data[l][idx[l]:idx[l]+10].tolist()
+                y[user] += (l*np.ones(10)).tolist()
+                idx[l] += 10
+
+        print("IDX1:", idx)  # counting samples for each labels
+
+        # Assign remaining sample by power law
+        user = 0
+        props = np.random.lognormal(
+            0, 2., (10, NUM_USERS, NUM_LABELS))  # last 5 is 5 labels
+        props = np.array([[[len(v)-NUM_USERS]] for v in data]) * \
+            props/np.sum(props, (1, 2), keepdims=True)
+        # print("here:",props/np.sum(props,(1,2), keepdims=True))
+        #props = np.array([[[len(v)-100]] for v in mnist_data]) * \
+        #    props/np.sum(props, (1, 2), keepdims=True)
+        #idx = 1000*np.ones(10, dtype=np.int64)
+        # print("here2:",props)
+        for user in trange(NUM_USERS):
+            for j in range(NUM_LABELS):  # 4 labels for each users
+                # l = (2*user+j)%10
+                l = (user + j) % 10
+                num_samples = int(props[l, user//int(NUM_USERS/10), j])
+                numran1 = random.randint(1000, 3000)
+                num_samples = num_samples  + numran1 #+ 200
+                if(NUM_USERS <= 20): 
+                    num_samples = num_samples * 2
+                if idx[l] + num_samples < len(data[l]):
+                    X[user] += data[l][idx[l]:idx[l]+num_samples].tolist()
+                    y[user] += (l*np.ones(num_samples)).tolist()
+                    idx[l] += num_samples
+                    print("check len os user:", user, j,
+                        "len data", len(X[user]), num_samples)
+
+        print("IDX2:", idx) # counting samples for each labels
+
+
+
+
     # Create data structure
     train_data = {'users': [], 'user_data':{}, 'num_samples':[]}
     test_data = {'users': [], 'user_data':{}, 'num_samples':[]}
@@ -190,6 +261,9 @@ def load_data(current_directory):
     print("Numb_testing_samples:", test_data['num_samples'])
     print("Total_testing_samples:",sum(test_data['num_samples']))
     # print("Median of data samples:", np.median(all_samples))
+
+
+
 
     with open(train_path,'w') as outfile:
         json.dump(train_data, outfile)

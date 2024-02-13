@@ -4,7 +4,7 @@ import argparse
 def args_parser():
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("--model_name", type=str, default="ResNet50FT", choices=["SimpleCNN",
+    parser.add_argument("--model_name", type=str, default="AMemNetModel", choices=["SimpleCNN",
                                                                             "VGG16FC",
                                                                             "ResNet18FC",
                                                                             "ResNet50FC",
