@@ -12,9 +12,45 @@ from sklearn.model_selection import train_test_split
 import random
 import time
 
-
-
 class MyDataset(Dataset):
+    def __init__(self, data_dir, csv_file, transform):
+        self.data_dir = data_dir
+        self.csv_file = csv_file
+        self.transform = transform
+        
+        self.data = []
+        self.target = []
+
+        # Load the labels from the CSV file
+        with open(csv_file, "r") as f:
+            next(f)
+            reader = csv.reader(f)
+            for row in reader:
+                self.data.append(os.path.join(data_dir, row[0]))
+                self.target.append(int(row[1]))
+           
+           
+           # self.labels = [line.strip().split(",")[1] for line in f]
+            # print(self.labels)
+    
+
+    def __len__(self):
+        print("number of labels:",len(self.labels))
+
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        image = Image.open(self.data[idx])
+        if self.transform is not None:
+            image = self.transform(image)
+        
+        # Convert the image to a PyTorch tensor
+        # image = torch.from_numpy(np.array(image))
+
+        return image, self.target[idx]
+
+
+"""class MyDataset(Dataset):
     def __init__(self, data_dir, csv_file): # .transform
         self.data_dir = data_dir
         self.csv_file = csv_file
@@ -52,7 +88,7 @@ class MyDataset(Dataset):
         # image = torch.from_numpy(np.array(image))
 
         return image, self.target[idx]
-
+"""
 def generate_list_with_sum(n, total_sum, min_value, max_value):
     """Generate a list of 'n' integers with a specific total sum and within a given range."""
     # Check if it's possible to create such a list
@@ -75,17 +111,20 @@ def generate_list_with_sum(n, total_sum, min_value, max_value):
 
 def load_data(current_directory, data_div):
     print("at load data")
-    data_dir = current_directory + "/dataset/r3_mem_ResNet50FC_features"
-    csv_file = current_directory + "/dataset/tensor_training_file.csv"
+    # data_dir = current_directory + "/dataset/r3_mem_ResNet50FC_features"
+    # csv_file = current_directory + "/dataset/tensor_training_file.csv"
+    
+    data_dir = current_directory + "/dataset/r3_refined"
+    csv_file = current_directory + "/dataset/refined_training_file.csv"
+    
     # Create a transform to resize and normalize the images
-    """transform = transforms.Compose([
+    transform = transforms.Compose([
         transforms.Resize(32),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
-"""
     # Create a Dataset object
-    dataset = MyDataset(data_dir, csv_file)
+    dataset = MyDataset(data_dir, csv_file, transform)
 
     images = []
     targets = []
@@ -115,8 +154,8 @@ def load_data(current_directory, data_div):
     NUM_USERS = 20
 
     # Setup directory for train/test data
-    train_path = current_directory +'/FedMEM_dataset/train/fedr3_train.json'
-    test_path = current_directory +'/FedMEM_dataset/test/fedr3_test.json'
+    train_path = current_directory +'/FedMEM_dataset/train/equal_from_img_fedr3_train.json'
+    test_path = current_directory +'/FedMEM_dataset/test/equal_from_img_fedr3_test.json'
     dir_path = os.path.dirname(train_path)
     if not os.path.exists(dir_path):
        os.makedirs(dir_path)
@@ -167,15 +206,17 @@ def load_data(current_directory, data_div):
         print("at n_iid div")
         NUM_LABELS = 2
         if NUM_USERS < 2:
-            raise ValueError("Size must be greater than 1.")
+            raise ValueError("Size must be greater than 2.")
         data = []
-        print(targets)
-        input("press")
+        print(len(targets))
+        #input("press")
         for i in trange(10):
             idx = targets == i
-            print(idx)
+            print(len(images[idx]))
+            input("press")
             data.append(images[idx])
-            print(len(data))
+            print(len(data[i]))
+            #input("press")
 
         print("\nNumb samples of each label:\n", [len(v) for v in data])
         users_lables = []
@@ -212,17 +253,13 @@ def load_data(current_directory, data_div):
             for j in range(NUM_LABELS):  # 4 labels for each users
                 # l = (2*user+j)%10
                 l = (user + j) % 10
-                num_samples = int(props[l, user//int(NUM_USERS/10), j])
-                numran1 = random.randint(1000, 3000)
-                num_samples = num_samples  + numran1 #+ 200
-                if(NUM_USERS <= 20): 
-                    num_samples = num_samples * 2
-                if idx[l] + num_samples < len(data[l]):
-                    X[user] += data[l][idx[l]:idx[l]+num_samples].tolist()
-                    y[user] += (l*np.ones(num_samples)).tolist()
-                    idx[l] += num_samples
-                    print("check len os user:", user, j,
-                        "len data", len(X[user]), num_samples)
+                #num_samples = int(props[l, user//int(NUM_USERS/10), j])
+                numran1 = random.randint(100, 250)
+                num_samples = numran1  # + num_samples + numran1 #+ 200
+                X[user] += data[l][idx[l]:idx[l]+num_samples].tolist()
+                y[user] += (l*np.ones(num_samples)).tolist()
+                idx[l] += num_samples
+                print("check len of user:", user, "label:", j, "len data", len(X[user]), num_samples)
 
         print("IDX2:", idx) # counting samples for each labels
 
@@ -256,18 +293,21 @@ def load_data(current_directory, data_div):
         test_data['num_samples'].append(len(y_test))
         # all_samples.append(train_len + test_len)
 
-    print("Num_samples:", train_data['num_samples'])
     print("Total_samples:",sum(train_data['num_samples'] + test_data['num_samples']))
-    print("Numb_testing_samples:", test_data['num_samples'])
+    print("training_samples:", train_data['num_samples'])
+    print("Total_testing_samples:",sum(train_data['num_samples']))
+    print("testing_samples:", test_data['num_samples'])
     print("Total_testing_samples:",sum(test_data['num_samples']))
     # print("Median of data samples:", np.median(all_samples))
 
 
 
 
-    with open(train_path,'w') as outfile:
-        json.dump(train_data, outfile)
-    with open(test_path, 'w') as outfile:
-        json.dump(test_data, outfile)
+    # with open(train_path,'w') as outfile:
+    #    json.dump(train_data, outfile)
+    # with open(test_path, 'w') as outfile:
+    #    json.dump(test_data, outfile)
 
     print("Finish Generating Samples")
+
+    return train_data, test_data

@@ -2,7 +2,7 @@ import torch
 import os
 import h5py
 from src.Fedavg.UserFedAvg import UserAvg
-from src.utils.data_process import read_data, read_user_data
+#from src.utils.data_process import read_data, read_user_data
 import numpy as np
 import copy
 from datetime import date
@@ -22,7 +22,8 @@ class FedAvg():
         self.local_iters = args.local_iters
         self.batch_size = args.batch_size
         self.learning_rate = args.alpha
-        self.num_users = args.numusers   #selected users
+        self.num_users = args.selected_users   #selected users
+        self.total_users = args.total_users
         self.num_teams = args.num_teams
         self.group_division = args.group_division
         self.total_train_samples = 0
@@ -36,6 +37,7 @@ class FedAvg():
         """
 
         self.global_model = copy.deepcopy(model)
+        self.sv_global_model = copy.deepcopy(model)
         self.global_model_name = args.model_name
   
 
@@ -46,14 +48,14 @@ class FedAvg():
         self.global_train_loss = [] 
         self.global_test_acc = [] 
         self.global_test_loss = []
-        
-        data = read_data(args, current_directory)
-        self.tot_users = len(data[0])
-        print(self.tot_users)
+        self.minimum_test_loss = 0.0
+        # data = read_data(args, current_directory)
+        # self.tot_users = len(data[0])
+        # print(self.tot_users)
 
-        for i in trange(self.tot_users, desc="Data distribution to clients"):
-            id, train, test = read_user_data(i, data)
-            user = UserAvg(device, train, test, model, args, i)
+        for i in trange(self.total_users, desc="Data distribution to clients"):
+            # id, train, test = read_user_data(i, data)
+            user = UserAvg(device, model, args, i)
             self.users.append(user)
             self.total_train_samples += user.train_samples
 
@@ -81,11 +83,23 @@ class FedAvg():
         for user in self.selected_users:
             self.add_parameters(user, user.train_samples / total_train)
 
-    def save_model(self):
-        model_path = os.path.join("models", self.dataset)
-        if not os.path.exists(model_path):
-            os.makedirs(model_path)
-        torch.save(self.global_model, os.path.join(model_path, "server" + ".pt"))
+    
+
+    def save_model(self, glob_iter):
+        if glob_iter == 0:
+            self.minimum_test_loss = self.global_test_loss[glob_iter]
+        else:
+            print(self.global_test_loss[glob_iter])
+            print(self.minimum_test_loss)
+            if self.global_test_loss[glob_iter] < self.minimum_test_loss:
+                self.minimum_test_loss = self.global_test_loss[glob_iter]
+                model_path = self.current_directory + "/models/" + self.global_model_name + "/" + self.algorithm + "/global_model/"
+                print(model_path)
+                # input("press")
+                if not os.path.exists(model_path):
+                    os.makedirs(model_path)
+                print(f"saving global model at round {glob_iter}")
+                torch.save(self.sv_global_model, os.path.join(model_path, "server_" + ".pt"))
 
     def load_model(self):
         model_path = os.path.join("models", self.dataset, "server" + ".pt")
@@ -120,18 +134,18 @@ class FedAvg():
         
         for glob_iter in trange(self.num_glob_iters, desc="Global Rounds"):
             self.send_parameters()
-            self.evaluate()
-            self.selected_users = self.select_users(glob_iter, 8)
+            self.selected_users = self.select_users(glob_iter, 10)
             list_user_id = []
             for user in self.selected_users:
                 list_user_id.append(user.id)
 
             for user in tqdm(self.selected_users, desc="running clients"):
                 user.train()  # * user.train_samples
-            
 
             self.aggregate_parameters()
-            self.save_global_model(glob_iter)
+            # self.save_global_model(glob_iter)
+            self.evaluate()
+            self.save_model(glob_iter)
         self.save_results()
         
         self.plot_result()

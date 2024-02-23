@@ -1,9 +1,36 @@
 import torch.nn as nn
 import torch
+import torchvision
 from torchvision import models
 import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
+
+
+
+class ResNet50TL(nn.Module):
+
+    def __init__(self):
+        super(ResNet50TL, self).__init__() 
+        resnet = torchvision.models.resnet50(pretrained=True)
+        self.avgpool = nn.Sequential(list(resnet.children())[-2])
+        # Define linear layers and ReLU activation
+        self.fc1 = nn.Linear(2048, 512)  # Assuming the output of avgpool is [batch_size, 2048, 1, 1]
+        self.dropout = nn.Dropout(0.5)  # Dropout p=0.5
+        self.batchnorm1 = nn.BatchNorm1d(512)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(512, 10)
+        
+    def forward(self, x):
+        features_1d = self.avgpool(x)
+        features_1d = torch.flatten(features_1d, 1)  # Flatten the features
+        x = self.fc1(features_1d)
+        x = self.dropout(x)
+        x = self.batchnorm1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.relu(x)
+        return x
 
 
 class SimpleCNN(nn.Module):
@@ -105,7 +132,7 @@ class ResNet50FT(nn.Module):
     def __init__(self):
         super(ResNet50FT, self).__init__()
         self.core_cnn = models.resnet50(pretrained=True)
-        self.avgpool = nn.AvgPool2d(3)
+        self.avgpool = nn.AvgPool2d(7)
         expansion = 2
         self.fc = nn.Linear(512 * expansion, 10)
         return

@@ -1,7 +1,7 @@
 import zipfile
 
 # Specify the path to your zip file
-zip_file_path = '/proj/sourasb-220503/FedMEM/dataset/R3_data_notes.txt-20230905T133706Z-001.zip'
+zip_file_path = '/proj/sourasb-220503/FedMEM/dataset/r3_mem_ResNet50_features.zip'
 
 # Specify the directory where you want to extract the zip file
 extract_to_directory = '/proj/sourasb-220503/FedMEM/dataset/'

@@ -2,10 +2,10 @@ from torch.optim import Optimizer
 import torch
 
 class BBOptimizer(Optimizer):
-    def __init__(self, params, alpha_init, lamda=0.5):
+    def __init__(self, params, alpha=0.05, lamda=0.5):
 
         alpha_bound=(0.005, 0.05)
-        defaults = dict(alpha=alpha_init, alpha_bound=alpha_bound, lamda=lamda)
+        defaults = dict(alpha=alpha, alpha_bound=alpha_bound, lamda=lamda)
         super(BBOptimizer, self).__init__(params, defaults)
 
     def step(self, cluster_model, closure=None):
@@ -21,45 +21,45 @@ class BBOptimizer(Optimizer):
                 if p.grad is None:
                     continue
 
-                grad = p.grad.data
-                state = self.state[p]
+                # grad = p.grad.data
+                # state = self.state[p]
 
                 # State initialization
-                if len(state) == 0:
-                    state['step'] = 0
-                    state['alpha'] = group['alpha']
-                    state['old_grad'] = torch.zeros_like(p.data)
-                    state['old_param'] = torch.clone(p.data).detach()
+                # if len(state) == 0:
+                #    state['step'] = 0
+                #    state['alpha'] = group['alpha']
+                #    state['old_grad'] = torch.zeros_like(p.data)
+                #    state['old_param'] = torch.clone(p.data).detach()
 
-                old_grad = state['old_grad']
-                old_param = state['old_param']
-                state['step'] += 1
+                # old_grad = state['old_grad']
+                # old_param = state['old_param']
+                # state['step'] += 1
 
                 # BB step size calculation
-                s = p.data - old_param
-                y = grad - old_grad
+                # s = p.data - old_param
+                # y = grad - old_grad
 
                 # Avoid division by zero
-                sty = torch.dot(s.view(-1), y.view(-1))
-                if sty <= 0:
-                    alpha = group['alpha']
-                else:
-                    alpha = sty / torch.dot(y.view(-1), y.view(-1))
+                # sty = torch.dot(s.view(-1), y.view(-1))
+                # if sty <= 0:
+                #     alpha = group['alpha']
+                # else:
+                #    alpha = sty / torch.dot(y.view(-1), y.view(-1))
                     # Bound the step size for stability
                     # print("alpha :",alpha.item())
                     # print("alpha_bound[1]:",alpha_bound[1])
                     # print("alpha_bound[0]:",alpha_bound[0])
                     
-                    alpha = max(min(alpha, alpha_bound[1]), alpha_bound[0])
+                #   alpha = max(min(alpha, alpha_bound[1]), alpha_bound[0])
                     # print("after maximization minimization alpha :",alpha)
 
                 # Update parameters
                 #p.data.add_(-alpha, grad)
                 # print("alpha = ",alpha)
-                p.data = p.data - alpha*grad  +  0.005*(p.data - cluster_weight.data)
+                p.data = p.data - 0.01*p.grad.data +  0.005*(p.data - cluster_weight.data)
                 # Update state
-                state['old_grad'] = torch.clone(grad).detach()
-                state['old_param'] = torch.clone(p.data).detach()
+                # state['old_grad'] = torch.clone(grad).detach()
+                # state['old_param'] = torch.clone(p.data).detach()
 
         return loss
 
