@@ -13,7 +13,7 @@ from sklearn.cluster import SpectralClustering
 import time
 # Implementation for FedAvg Server
 import matplotlib.pyplot as plt
-
+import statistics
 class FedAvg():
     def __init__(self,device, model, args, exp_no, current_directory):
                 
@@ -51,6 +51,10 @@ class FedAvg():
         self.global_train_loss = [] 
         self.global_test_acc = [] 
         self.global_test_loss = []
+        self.global_precision = []
+        self.global_recall = []
+        self.global_f1score = []
+        
         self.minimum_test_loss = 0.0
         # data = read_data(args, current_directory)
         # self.tot_users = len(data[0])
@@ -149,59 +153,68 @@ class FedAvg():
 
             self.aggregate_parameters()
             # self.save_global_model(glob_iter)
-            self.evaluate()
+            self.evaluate(glob_iter)
             self.save_model(glob_iter)
         self.save_results()
         
         self.plot_result()
 
     
-    def test_server(self):
-        num_samples = []
-        tot_correct = []
+    def test_error_and_loss(self):
+        
+        accs = []
         losses = []
+        precisions = []
+        recalls = []
+        f1s = []
         
         for c in self.users:
-            ct, ls,  ns = c.test(self.global_model.parameters())
-            tot_correct.append(ct * 1.0)
-            num_samples.append(ns)
-            losses.append(ls)
+            accuracy, loss, precision, recall, f1 = c.test(self.global_model.parameters())
+            # tot_correct.append(ct * 1.0)
+            # num_samples.append(ns)
+            accs.append(accuracy)
+            losses.append(loss)
+            precisions.append(precision)
+            recalls.append(recall)
+            f1s.append(f1)
             
-        return num_samples, tot_correct, losses
+        return accs, losses, precisions, recalls, f1s
 
     def train_error_and_loss(self):
-        num_samples = []
-        tot_correct = []
+        accs = []
         losses = []
         for c in self.users:
-            ct, cl, ns = c.train_error_and_loss(self.global_model.parameters())
-            tot_correct.append(ct * 1.0)
-            num_samples.append(ns)
-            losses.append(cl * 1.0)
+            accuracy, loss = c.train_error_and_loss(self.global_model.parameters())
+            accs.append(accuracy)
+            losses.append(loss)
 
         
-        return num_samples, tot_correct, losses
+        return accs, losses
 
 
-    def evaluate(self):
+    def evaluate(self, t):
 
-        stats_test = self.test_server()
-        stats_train = self.train_error_and_loss()
-        test_acc = np.sum(stats_test[1]) * 1.0 / np.sum(stats_test[0])
-        train_acc = np.sum(stats_train[1]) * 1.0 / np.sum(stats_train[0])
-        test_loss = sum([x * y for (x, y) in zip(stats_test[0], stats_test[2])]).item() / np.sum(stats_test[0])
-        train_loss = sum([x * y for (x, y) in zip(stats_train[0], stats_train[2])]).item() / np.sum(stats_train[0])
+        test_accs, test_losses, precisions, recalls, f1s = self.test_error_and_loss()
+        train_accs, train_losses  = self.train_error_and_loss()
+        
 
-        self.global_train_acc.append(train_acc)
-        self.global_test_acc.append(test_acc)
-        self.global_train_loss.append(train_loss)
-        self.global_test_loss.append(test_loss)
+        self.global_train_acc.append(statistics.mean(train_accs))
+        self.global_test_acc.append(statistics.mean(test_accs))
+        self.global_train_loss.append(statistics.mean(train_losses))
+        self.global_test_loss.append(statistics.mean(test_losses))
+        self.global_precision.append(statistics.mean(precisions))
+        self.global_recall.append(statistics.mean(recalls))
+        self.global_f1score.append(statistics.mean(f1s))
+        
 
-        print("Global Trainning Accurancy: ", train_acc)
-        print("Global Trainning Loss: ", train_loss)
-        print("Global test accurancy: ", test_acc)
-        print("Global test_loss:",test_loss)
-    
+        print(f"Global Trainning Accurancy: {self.global_train_acc[t]}" )
+        print(f"Global Trainning Loss: {self.global_train_loss[t]}")
+        print(f"Global test accurancy: {self.global_test_acc[t]}")
+        print(f"Global test_loss: {self.global_test_loss[t]}")
+        print(f"Global Precision: {self.global_precision[t]}")
+        print(f"Global Recall: {self.global_recall[t]}")
+        print(f"Global f1score: {self.global_f1score[t]}")
+
 
     def plot_result(self):
         

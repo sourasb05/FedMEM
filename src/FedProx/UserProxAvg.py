@@ -8,6 +8,7 @@ import numpy as np
 import copy
 from src.utils.data_process import FeatureDataset
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 
 class UserProx():
 
@@ -106,28 +107,65 @@ class UserProx():
 
     def test(self, global_model):
         self.local_model.eval()
-        test_acc = 0
-        loss = 0
         self.update_parameters(global_model)
-        for x, y in self.testloaderfull:
-            x, y = x.to(self.device), y.to(self.device)
-            output = self.local_model(x)
-            test_acc += (torch.sum(torch.argmax(output, dim=1) == y)).item()
-            loss += self.loss(output, y)
-        return test_acc, loss, y.shape[0]
+        y_true = []
+        y_pred = []
+        
+        total_loss = 0.0
+        with torch.no_grad():  # Inference mode, gradients not needed
+            for inputs, labels in self.testloaderfull:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                outputs = self.local_model(inputs)
+                loss = self.loss(outputs, labels)
+                total_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                # total += labels.size(0)
+                # correct += (predicted == labels).sum().item()
+                y_true.extend(labels.cpu().numpy())  # Collect true labels
+                y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
+
+        # Convert collected labels to numpy arrays for metric calculation
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+    
+        # Calculate metrics
+        accuracy = accuracy_score(y_true, y_pred)
+        validation_loss = total_loss / len(self.testloaderfull)
+        precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+                
+        return accuracy, validation_loss, precision, recall, f1
 
     def train_error_and_loss(self, global_model):
         self.local_model.eval()
-        train_acc = 0
-        loss = 0
+        y_true = []
+        y_pred = []
+        
+        total_loss = 0.0
         self.update_parameters(global_model)
-        for x, y in self.trainloaderfull:
-            x, y = x.to(self.device), y.to(self.device)
-            output = self.local_model(x)
-            train_acc += (torch.sum(torch.argmax(output, dim=1) == y)).item()
-            loss += self.loss(output, y)
-            
-        return train_acc, loss, y.shape[0]
+        
+        with torch.no_grad():  # Inference mode, gradients not needed
+            for inputs, labels in self.trainloaderfull:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                outputs = self.local_model(inputs)
+                loss = self.loss(outputs, labels)
+                total_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                # total += labels.size(0)
+                # correct += (predicted == labels).sum().item()
+                y_true.extend(labels.cpu().numpy())  # Collect true labels
+                y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
+
+        # Convert collected labels to numpy arrays for metric calculation
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+    
+        # Calculate metrics
+        accuracy = accuracy_score(y_true, y_pred)
+        train_loss = total_loss / len(self.testloaderfull)
+                
+        return accuracy, train_loss
 
     
     def get_next_train_batch(self):
