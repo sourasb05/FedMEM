@@ -55,6 +55,7 @@ def main(args):
         except ValueError:
             raise ValueError("Wrong algorithm selected")
         server.train()
+        i+=1
         # server.test()
     # pbar.close()
 if __name__ == "__main__":

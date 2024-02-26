@@ -17,7 +17,7 @@ class BBOptimizer(Optimizer):
             alpha_bound = group['alpha_bound']
             # print(alpha_bound)
             
-            for p, cluster_weight in zip(group['params'],cluster_model.parameters()):
+            for p, cluster_weight in zip(group['params'],cluster_model):
                 if p.grad is None:
                     continue
 
@@ -56,7 +56,7 @@ class BBOptimizer(Optimizer):
                 # Update parameters
                 #p.data.add_(-alpha, grad)
                 # print("alpha = ",alpha)
-                p.data = p.data - 0.001*p.grad.data +  0.0005*(p.data - cluster_weight.data)
+                p.data = p.data - 0.01*p.grad.data +  0.0005*(p.data - cluster_weight.data)
                 # Update state
                 # state['old_grad'] = torch.clone(grad).detach()
                 # state['old_param'] = torch.clone(p.data).detach()

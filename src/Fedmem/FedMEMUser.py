@@ -125,60 +125,144 @@ class Fedmem_user():
         return self.local_weight_updated
 
     def update_parameters(self, new_params):
-        for param, new_param in zip(self.eval_model.parameters(), new_params.parameters()):
+        for param, new_param in zip(self.eval_model.parameters(), new_params):
             param.data = new_param.data.clone()
 
 
     def test(self, global_model):
+        # Set the model to evaluation mode
         self.eval_model.eval()
-        test_acc = 0
-        loss = 0
         self.update_parameters(global_model)
-        for x, y in self.testloaderfull:
-            x, y = x.to(self.device), y.to(self.device)
-            output = self.local_model(x)
-            test_acc += (torch.sum(torch.argmax(output, dim=1) == y)).item()
-            loss += self.loss(output, y)
-        return test_acc, loss, y.shape[0]
+        y_true = []
+        y_pred = []
+        
+        total_loss = 0.0
+        with torch.no_grad():  # Inference mode, gradients not needed
+            for inputs, labels in self.testloaderfull:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                outputs = self.eval_model(inputs)
+                loss = self.loss(outputs, labels)
+                total_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                # total += labels.size(0)
+                # correct += (predicted == labels).sum().item()
+                y_true.extend(labels.cpu().numpy())  # Collect true labels
+                y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
+
+        # Convert collected labels to numpy arrays for metric calculation
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+    
+        # Calculate metrics
+        accuracy = accuracy_score(y_true, y_pred)
+        validation_loss = total_loss / len(self.testloaderfull)
+        precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+                
+        return accuracy, validation_loss, precision, recall, f1
 
     def test_local(self):
         self.local_model.eval()
-        test_acc = 0
         loss = 0
-        # self.update_parameters(self.local_model)
-        for x, y in self.testloaderfull:
-            x, y = x.to(self.device), y.to(self.device)
-            output = self.local_model(x)
-            test_acc += (torch.sum(torch.argmax(output, dim=1) == y)).item()
-            loss += self.loss(output, y)
-        return test_acc, loss, y.shape[0]
+    
+        y_true = []
+        y_pred = []
+        
+        total_loss = 0.0
+        with torch.no_grad():  # Inference mode, gradients not needed
+            for inputs, labels in self.testloaderfull:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                outputs = self.local_model(inputs)
+                loss = self.loss(outputs, labels)
+                total_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                # total += labels.size(0)
+                # correct += (predicted == labels).sum().item()
+                y_true.extend(labels.cpu().numpy())  # Collect true labels
+                y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
+
+        # Convert collected labels to numpy arrays for metric calculation
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+    
+        # Calculate metrics
+        accuracy = accuracy_score(y_true, y_pred)
+        validation_loss = total_loss / len(self.testloaderfull)
+        precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+                
+        return accuracy, validation_loss, precision, recall, f1
 
 
     def train_error_and_loss(self, global_model):
+      
+        # Set the model to evaluation mode
         self.eval_model.eval()
-        train_acc = 0
-        loss = 0
         self.update_parameters(global_model)
-        for x, y in self.trainloaderfull:
-            x, y = x.to(self.device), y.to(self.device)
-            output = self.local_model(x)
-            train_acc += (torch.sum(torch.argmax(output, dim=1) == y)).item()
-            loss += self.loss(output, y)
-            
-        return train_acc, loss, y.shape[0]
+        y_true = []
+        y_pred = []
+        
+        total_loss = 0.0
+        with torch.no_grad():  # Inference mode, gradients not needed
+            for inputs, labels in self.trainloaderfull:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                outputs = self.eval_model(inputs)
+                loss = self.loss(outputs, labels)
+                total_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                # total += labels.size(0)
+                # correct += (predicted == labels).sum().item()
+                y_true.extend(labels.cpu().numpy())  # Collect true labels
+                y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
+
+        # Convert collected labels to numpy arrays for metric calculation
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+    
+        # Calculate metrics
+        accuracy = accuracy_score(y_true, y_pred)
+        train_loss = total_loss / len(self.testloaderfull)
+        # precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        # recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        # f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+                
+        return accuracy, train_loss
 
     def train_error_and_loss_local(self):
         self.local_model.eval()
-        train_acc = 0
         loss = 0
-        # self.update_parameters(self.local_model)
-        for x, y in self.trainloaderfull:
-            x, y = x.to(self.device), y.to(self.device)
-            output = self.local_model(x)
-            train_acc += (torch.sum(torch.argmax(output, dim=1) == y)).item()
-            loss += self.loss(output, y)
-            
-        return train_acc, loss, y.shape[0]
+    
+        y_true = []
+        y_pred = []
+        
+        total_loss = 0.0
+        with torch.no_grad():  # Inference mode, gradients not needed
+            for inputs, labels in self.trainloaderfull:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                outputs = self.local_model(inputs)
+                loss = self.loss(outputs, labels)
+                total_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                # total += labels.size(0)
+                # correct += (predicted == labels).sum().item()
+                y_true.extend(labels.cpu().numpy())  # Collect true labels
+                y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
+
+        # Convert collected labels to numpy arrays for metric calculation
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+    
+        # Calculate metrics
+        accuracy = accuracy_score(y_true, y_pred)
+        train_loss = total_loss / len(self.testloaderfull)
+        # precision = precision_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
+        # recall = recall_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
+        # f1 = f1_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
+                
+        return accuracy, train_loss
+
     
     def load_model(self):
         model_path = os.path.join("models", self.dataset)
@@ -210,26 +294,21 @@ class Fedmem_user():
         y_pred = np.array(y_pred)
     
         # Calculate metrics
-        accuracy = accuracy_score(y_true, y_pred)
+        # accuracy = accuracy_score(y_true, y_pred)
         validation_loss = total_loss / len(self.testloaderfull)
-        #precision = precision_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
-        #recall = recall_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
-        #f1 = f1_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
-        precision = 0
-        recall = 0
-        f1 = 0
+        # precision = precision_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
+        # recall = recall_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
+        # f1 = f1_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
+        
         if epoch == 0 and self.minimum_loss == 0.0:
-            self.minimum_loss = validation_loss
+            self.minimum_per_loss = validation_loss
         else:
-            if validation_loss < self.minimum_loss:
-                self.minimum_loss = validation_loss
+            if validation_loss < self.minimum_per_loss:
+                self.minimum_per_loss = validation_loss
                 # print(f"new minimum loss of local model at client {self.id} found at global round {t} local epoch {epoch}")
                 self.save_local_model(epoch, t)
                 
-        return accuracy, validation_loss, precision, recall, f1
-
-
-
+        
     
     def save_local_model(self, iter, t):
         # file = "per_model_user"+ str(self.id) +"_exp_no_" + str(self.exp_no) + "_LR_" + str(iter) + "_GR_" + str(t) 
@@ -243,7 +322,7 @@ class Fedmem_user():
             os.makedirs(self.current_directory + "/models/"+ directory_name)
         
         torch.save(self.local_model,self.current_directory + "/models/"+ directory_name + "/" + file + ".pt")
-        # print("local model saved")
+        # print(f"local model saved at global round :{t} local round :{iter}")
 
     def train(self, cluster_model, t):
         
@@ -264,10 +343,6 @@ class Fedmem_user():
                 #self.optimizer.step()
                 running_loss += loss.item()
             # print(f"Epoch {epoch+1}, Training Loss: {running_loss/len(self.train_loader)}")
-            val_accuracy, validation_loss, precision, recall, f1 = self.evaluate_model(epoch, t)
-            # print(f"Epoch {epoch+1}, Validation Loss: {validation_loss}")
-            # print(f'Validation Accuracy: {val_accuracy:.2f}')
-            # print(f'Precision: {precision:.2f}')
-            # print(f'Recall: {recall:.2f}')
-            # print(f'f1: {f1:.2f}')
+            self.evaluate_model(epoch, t)
+            
     

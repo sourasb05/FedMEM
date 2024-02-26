@@ -14,7 +14,7 @@ def args_parser():
     parser.add_argument("--batch_size", type=int, default=124)
     parser.add_argument("--beta", type=float, default=0.3,
                         help="Regularizer for PerMFL")
-    parser.add_argument("--lamda", type=float, default=0.01, 
+    parser.add_argument("--lamda", type=float, default=0.5, 
                         help="Regularization term lambda")
     parser.add_argument("--gamma", type=float, default=3.0, 
                         help="regularization term gamma for PerMFL and scale parameter for RBF kernel in Fedmem")
@@ -23,14 +23,14 @@ def args_parser():
     parser.add_argument("--eta", type=float, default=0.03, 
                         help="Learning rate for Teams in PerMFL")
     
-    parser.add_argument("--num_global_iters", type=int, default=100)
+    parser.add_argument("--num_global_iters", type=int, default=50)
     parser.add_argument("--num_team_iters", type=int, default=10)
     parser.add_argument("--local_iters", type=int, default=10)
     parser.add_argument("--optimizer", type=str, default="SGD")
     
-    parser.add_argument("--times", type=int, default=10, 
+    parser.add_argument("--times", type=int, default=1, 
                         help="running time")
-    parser.add_argument("--exp_start", type=int, default=1,
+    parser.add_argument("--exp_start", type=int, default=0,
                         help="experiment start no")
     parser.add_argument("--gpu", type=int, default=0,
                         help="Which GPU to run the experiments, -1 mean CPU, 0,1,2 for GPU")
@@ -40,7 +40,7 @@ def args_parser():
     parser.add_argument("--total_users", type=int, default=10, 
                         help="total participants")
    
-    parser.add_argument("--num_teams", type=int, default=2,
+    parser.add_argument("--num_teams", type=int, default=5,
                         help="Number of teams")
     parser.add_argument("--p_teams", type=int, default=1,
                         help="number of team selected per global round")
