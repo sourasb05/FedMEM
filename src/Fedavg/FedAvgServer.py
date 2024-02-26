@@ -22,8 +22,12 @@ class FedAvg():
         self.local_iters = args.local_iters
         self.batch_size = args.batch_size
         self.learning_rate = args.alpha
-        self.num_users = args.selected_users   #selected users
-        self.total_users = args.total_users
+        
+        self.user_ids = args.user_ids
+        print(f"user ids : {self.user_ids}")
+        self.total_users = len(self.user_ids)
+        print(f"total users : {self.total_users}")
+        self.num_users = self.total_users * args.users_frac    #selected users
         self.num_teams = args.num_teams
         self.group_division = args.group_division
         self.total_train_samples = 0
@@ -41,7 +45,6 @@ class FedAvg():
         self.global_model_name = args.model_name
   
 
-
         self.users = []
         self.selected_users = []
         self.global_train_acc = []
@@ -55,7 +58,7 @@ class FedAvg():
 
         for i in trange(self.total_users, desc="Data distribution to clients"):
             # id, train, test = read_user_data(i, data)
-            user = UserAvg(device, model, args, i)
+            user = UserAvg(device, model, args, int(self.user_ids[i]))
             self.users.append(user)
             self.total_train_samples += user.train_samples
 
@@ -134,10 +137,12 @@ class FedAvg():
         
         for glob_iter in trange(self.num_glob_iters, desc="Global Rounds"):
             self.send_parameters()
-            self.selected_users = self.select_users(glob_iter, 10)
+            self.selected_users = self.select_users(glob_iter, self.num_users)
+            
             list_user_id = []
             for user in self.selected_users:
                 list_user_id.append(user.id)
+            print(f"Exp no{self.exp_no} : users selected for global iteration {glob_iter} are : {list_user_id}")
 
             for user in tqdm(self.selected_users, desc="running clients"):
                 user.train()  # * user.train_samples
@@ -245,6 +250,10 @@ class FedAvg():
         # If the directory does not exist, create it
             os.makedirs(self.current_directory + "/results/" + directory_name)
 
+        # print("Global Trainning Accurancy: ", self.global_train_acc)
+        # print("Global Trainning Loss: ", self.global_train_loss)
+        # print("Global test accurancy: ", self.global_test_acc)
+        # print("Global test_loss:",self.global_test_loss)
 
 
         with h5py.File(self.current_directory + "/results/" + directory_name + "/" + '{}.h5'.format(file), 'w') as hf:

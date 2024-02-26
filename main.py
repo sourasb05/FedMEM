@@ -1,14 +1,16 @@
 from src.Fedavg.FedAvgServer import FedAvg
-from src.PerMFL.PerMFLServer import PerMFL
+#from src.PerMFL.PerMFLServer import PerMFL
 from src.Fedmem.FedMEMServer import Fedmem
-from src.FeSEM.FeSEM_server import FeSEM
+from src.FedProx.FedProxServer import FedProx
+#from src.FeSEM.FeSEM_server import FeSEM
 #from src.DemLearn.FLAlgorithms.servers.serverDemLearn import DemLearn
 # from src.Optimizer.Optimizer import PerMFL
 from src.TrainModels.trainmodels import *
-from src.utils.data_process import read_data
+# from src.utils.data_process import read_data
 from src.utils.options import args_parser
+import torchvision.models as models
 import torch
-from tqdm import trange
+from tqdm import tqdm, trange
 import os
 
 
@@ -19,31 +21,28 @@ def main(args):
 
     # print torch.device()
     # Get device status: Check GPU or CPU
+
+    # pbar = tqdm(times=args.times)
+
     device = torch.device("cuda:{}".format(args.gpu) if torch.cuda.is_available() and args.gpu != -1 else "cpu")
     current_directory = os.getcwd()
     print(current_directory)
-    for i in trange(args.times, desc='experiment number'):
+    i = args.exp_start
+    while i < args.times:
         try:
             if (args.model_name == "SimpleCNN"):
                 model = SimpleCNN().to(device)
-            elif(args.model_name == "ResNet50FT"):
-                model = ResNet50FT().to(device)
             elif(args.model_name == "AMemNetModel"):
                 model = AMemNetModel().to(device)
-            elif(args.model_name == "VGG16FC"):
-                model = VGG16FC().to(device)
-            elif(args.model_name == "ResNet18FC"):
-                model = ResNet18FC().to(device)
-            elif(args.model_name == "ResNet50FC"):
-                model = ResNet50FC().to(device)
-            elif(args.model_name == "ResNet101FC"):
-                model = ResNet101FC().to(device)
-                
+            else:
+                model = ResNet50TL().to(device)
         except ValueError:
             raise ValueError("Wrong model selected")
         try:    
             if args.algorithm == "FedAvg":
                 server = FedAvg(device, model, args,i, current_directory)
+            elif args.algorithm == "FedProx":
+                server = FedProx(device, model, args,i, current_directory)
             elif args.algorithm == "PerMFL":
                 server = PerMFL(device, model, args, i, current_directory)
             elif args.algorithm == "Fedmem":
@@ -57,7 +56,7 @@ def main(args):
             raise ValueError("Wrong algorithm selected")
         server.train()
         # server.test()
-
+    # pbar.close()
 if __name__ == "__main__":
     args = args_parser()
     

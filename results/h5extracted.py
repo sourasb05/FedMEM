@@ -2,7 +2,7 @@ import os
 import h5py
 import numpy as np
 attributes = []
-hf = h5py.File('/proj/sourasb-220503/FedMEM/results/ResNet50TL/Fedmem/h5/_exp_no_0_GR_10_BS_64.h5','r')
+hf = h5py.File('/proj/sourasb-220503/FedMEM/results/ResNet50TL/FedAvg/h5/_exp_no_0_GR_100_BS_124.h5','r')
 id = 0
 
 for key in hf.keys():
@@ -10,12 +10,12 @@ for key in hf.keys():
     print("id [",id,"] :", key)
     id+=1
 print(attributes)
-tsl = hf.get('per_test_loss')
-tsa = hf.get('per_test_accuracy')
-trl = hf.get('per_train_loss')
-tra = hf.get('per_train_accuracy')
-eta = hf.get('eta_0')
-lamda = hf.get('lambda_0')
+tsl = hf.get('global_test_loss')
+tsa = hf.get('global_test_accuracy')
+trl = hf.get('global_train_loss')
+tra = hf.get('global_train_accuracy')
+# eta = hf.get('eta_0')
+# lamda = hf.get('lambda_0')
 # print("eta 0", np.array(eta))
 # print("lamda 0", np.array(lamda))
 print("train accuracy",np.array(tra))

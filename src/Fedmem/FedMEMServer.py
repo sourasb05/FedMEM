@@ -22,8 +22,11 @@ class Fedmem():
         self.local_iters = args.local_iters
         self.batch_size = args.batch_size
         self.learning_rate = args.alpha
-        self.selected_users = args.selected_users   #selected users
-        self.tot_users = args.total_users
+        self.user_ids = args.user_ids
+        print(f"user ids : {self.user_ids}")
+        self.total_users = len(self.user_ids)
+        print(f"total users : {self.total_users}")
+        self.num_users = self.total_users * args.users_frac    #selected users
         self.num_teams = args.num_teams
         self.group_division = args.group_division
         self.total_train_samples = 0
@@ -88,9 +91,9 @@ class Fedmem():
         # self.tot_users = len(data[0])
         # print(self.tot_users)
 
-        for i in trange(self.tot_users, desc="Data distribution to clients"):
+        for i in trange(self.total_users, desc="Data distribution to clients"):
             # id, train, test = read_user_data(i, data)
-            user = Fedmem_user(device, self.global_model, args, i, exp_no, current_directory)
+            user = Fedmem_user(device, self.global_model, args, self.user_ids[i], exp_no, current_directory)
             self.users.append(user)
             self.total_train_samples += user.train_samples
 
@@ -256,11 +259,19 @@ class Fedmem():
                     
     def combine_cluster_user(self,clusters):
         self.cluster_dict = {}
-        for key, value in zip(clusters, self.selected_users):
+        self.cluster_dict_user_id = {}
+        user_ids = []
+        for user in self.selected_users:
+            user_ids.append(user.id)
+        for key, value, UID in zip(clusters, self.selected_users, user_ids):
             if key not in self.cluster_dict:
                 self.cluster_dict[key] = []
+                self.cluster_dict_user_id[key] = []
             self.cluster_dict[key].append(value)
-        print(self.cluster_dict[0])
+            self.cluster_dict_user_id[key].append(UID)
+
+        print(self.cluster_dict)
+        print(self.cluster_dict_user_id)
 
     def train(self):
         loss = []
@@ -271,7 +282,7 @@ class Fedmem():
             else:
                 self.send_cluster_parameters()
             
-            self.selected_users = self.select_users(t, 10).tolist()
+            self.selected_users = self.select_users(t, int(self.num_users)).tolist()
             list_user_id = []
             for user in self.selected_users:
                 list_user_id.append(user.id)

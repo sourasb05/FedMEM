@@ -42,9 +42,9 @@ class Fedmem_user():
 
         # Load dataset
         features_folder = '/proj/sourasb-220503/FedMEM/dataset/r3_mem_ResNet50_features'
-        annotations_file = '/proj/sourasb-220503/FedMEM/dataset/unequal_division/'+ 'client_' + str(self.id+1) +'.csv'
+        annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/'+ 'Client_ID_' + str(self.id) +'.csv'
         print(annotations_file)
-
+        
 
         dataset = FeatureDataset(features_folder, annotations_file)
 

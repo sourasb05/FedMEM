@@ -53,14 +53,14 @@ class UserAvg():
         
         self.optimizer = torch.optim.SGD([{'params': self.local_model.fc1.parameters()},
                                             {'params': self.local_model.fc2.parameters()}
-                                        ], lr=self.learning_rate, weight_decay=0.001)  # Only optimize the last layer
+                                        ], lr=self.learning_rate, weight_decay=0.01)  # Only optimize the last layer
 
 
 
 
         # Load dataset
         features_folder = '/proj/sourasb-220503/FedMEM/dataset/r3_mem_ResNet50_features'
-        annotations_file = '/proj/sourasb-220503/FedMEM/dataset/unequal_division/'+ 'client_' + str(self.id+1) +'.csv'
+        annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/'+ 'Client_ID_' + str(self.id) +'.csv'
         print(annotations_file)
         dataset = FeatureDataset(features_folder, annotations_file)
 
