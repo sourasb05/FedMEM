@@ -14,14 +14,16 @@ def args_parser():
     parser.add_argument("--batch_size", type=int, default=124)
     parser.add_argument("--beta", type=float, default=0.3,
                         help="Regularizer for PerMFL")
-    parser.add_argument("--lamda", type=float, default=0.5, 
-                        help="Regularization term lambda")
-    parser.add_argument("--gamma", type=float, default=3.0, 
+    parser.add_argument("--lambda_1", type=float, default=0.0, 
+                        help="Regularization term lambda_1")
+    parser.add_argument("--lambda_2", type=float, default=0.0, 
+                        help="Regularization term lambda_2")
+    parser.add_argument("--gamma", type=float, default=0.05, 
                         help="regularization term gamma for PerMFL and scale parameter for RBF kernel in Fedmem")
-    parser.add_argument("--alpha", type=float, default=0.05, 
-                        help="learning rate")
-    parser.add_argument("--eta", type=float, default=0.03, 
-                        help="Learning rate for Teams in PerMFL")
+    parser.add_argument("--alpha", type=float, default=0.01, 
+                        help="learning rate for local models in fedmem")
+    parser.add_argument("--eta", type=float, default=0.0005, 
+                        help="personalization parameter for Fedmem")
     
     parser.add_argument("--num_global_iters", type=int, default=50)
     parser.add_argument("--num_team_iters", type=int, default=10)
@@ -45,7 +47,7 @@ def args_parser():
     parser.add_argument("--p_teams", type=int, default=1,
                         help="number of team selected per global round")
     parser.add_argument("--group_division", type = int, default=2, help=" 0 : sequential division , 1 : random division , 2 : only one group")
-   
+    parser.add_argument("--target", type=int, default=10, choices=[3,10], help="number of target classes")
 
     args = parser.parse_args()
 

@@ -8,6 +8,7 @@ from datetime import date
 from tqdm import trange
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
 # from sklearn.cluster import SpectralClustering
 import time
 from sklearn.cluster import KMeans
@@ -23,6 +24,7 @@ class Fedmem():
         self.local_iters = args.local_iters
         self.batch_size = args.batch_size
         self.learning_rate = args.alpha
+        self.eta = args.eta
         self.user_ids = args.user_ids
         print(f"user ids : {self.user_ids}")
         self.total_users = len(self.user_ids)
@@ -34,10 +36,11 @@ class Fedmem():
         self.exp_no = exp_no
         self.n_clusters = args.num_teams
         self.gamma = args.gamma # scale parameter for RBF kernel 
-        self.lamda = args.lamda # similarity tradeoff
+        self.lambda_1 = args.lambda_1 # similarity tradeoff
+        self.lambda_2 = args.lambda_2
         self.current_directory = current_directory
         self.algorithm = args.algorithm
-        
+        self.target = args.target
         self.cluster_dict = {}
         self.clusters_list = []
         self.c = []
@@ -131,7 +134,7 @@ class Fedmem():
 
     def add_parameters(self, cluster_model, ratio):
         for server_param, cluster_param in zip(self.global_model.parameters(), cluster_model):
-            server_param.data += cluster_param.data.clone() * ratio
+            server_param.data += cluster_param.data.clone() * ratio 
 
     def global_update(self):
         for param in self.global_model.parameters():
@@ -143,7 +146,9 @@ class Fedmem():
     def add_parameters_clusters(self, user, ratio, cluster_id):
         
         for cluster_param, user_param in zip(self.c[cluster_id], user.get_parameters()):
-            cluster_param.data += ratio*user_param.data.clone()
+            cluster_param.data = cluster_param.data + ratio*user_param.data.clone() 
+        for cluster_param , global_param in zip(self.c[cluster_id], self.global_model.parameters()):
+            cluster_param.data += self.eta*(cluster_param.data - global_param.data)
 
             # print(f"cluster {cluster_id} model after adding user {user.id}'s local model : {cluster_param.data} ")
         # self.c[cluster_id] = copy.deepcopy(list(self.c[cluster_id].parameters()))
@@ -174,21 +179,22 @@ class Fedmem():
         return numerator / denominator
 
 
-    def flatten_params(self, model):
+    def flatten_params(self, parameters):
         params = []
-        for param in model.parameters():
+        for param in parameters:
             params.append(param.view(-1))
         return torch.cat(params)
     
-    def find_similarity(self, similarity_metric, params1, params2, params_g):
+    def find_similarity(self, similarity_metric, params1, params2, params_g, params_c):
                             
         if similarity_metric == "cosign similarity":
             similarity = torch.nn.functional.cosine_similarity(params1.unsqueeze(0), params2.unsqueeze(0))
         elif similarity_metric == "euclidian":
             similarity_u =  torch.exp(-self.gamma * torch.sqrt(torch.sum((params1 - params2) ** 2)))
             similarity_g =  torch.exp(-self.gamma * torch.sqrt(torch.sum((params1 + params2 - 2* params_g) ** 2)))
+            similarity_c = torch.exp(-self.gamma * torch.sqrt(torch.sum((params1 + params2 - 2*params_c) ** 2)))
             
-            similarity = (1-self.lamda)*similarity_u + self.lamda*similarity_g
+            similarity = (1-self.lambda_1 - self.lambda_2)*similarity_u + self.lambda_1*similarity_g + self.lambda_2*similarity_c
             # print(f"similarity_u : {similarity_u}, similarity_g : {similarity_g}, similarity : {similarity}")
             # print("RBF: ",similarity.item())
 
@@ -204,24 +210,36 @@ class Fedmem():
 
 
     def similarity_check(self):
+        clust_id = 0
         similarity_matrix = {}
         # similarity_metric = "manhattan"
         similarity_metric = "euclidian"
         #print("computing cosign similarity")
-        params_g = self.flatten_params(self.global_model)
+        params_g = self.flatten_params(self.global_model.parameters())
+        
         for user in tqdm(self.selected_users, desc="participating clients"):
+            
+            for key, values in self.cluster_dict.items():
+                if user in values:
+                    print(f"user {user.id} is in cluster {key}")
+                    clust_id = key
+                    break
+            
             if user.id not in similarity_matrix:
                 similarity_matrix[user.id] = []
             #print(similarity_matrix)
-            params1 = self.flatten_params(user.local_model)
+            
 
+
+            params1 = self.flatten_params(user.local_model.parameters())
+            params_c = self.flatten_params(self.c[clust_id])
             
             for comp_user in self.selected_users:
                 # if user != comp_user:
                     
-                params2 = self.flatten_params(comp_user.local_model)
+                params2 = self.flatten_params(comp_user.local_model.parameters())
 
-                similarity = self.find_similarity(similarity_metric, params1, params2, params_g)
+                similarity = self.find_similarity(similarity_metric, params1, params2, params_g, params_c)
 
 
                #print("user_id["+ str(user.id)+"] and user_id["+str(comp_user.id)+"] = ",similarity.item())
@@ -269,24 +287,23 @@ class Fedmem():
         kmeans = KMeans(n_clusters=n_clusters)
         kmeans.fit(eigenvectors)
         return kmeans.labels_
-  
-                    
+              
     def combine_cluster_user(self,clusters):
         self.cluster_dict = {}
-        cluster_dict_user_id = {}
+        self.cluster_dict_user_id = {}
         user_ids = []
         for user in self.selected_users:
             user_ids.append(user.id)
         for key, value, UID in zip(clusters, self.selected_users, user_ids):
             if key not in self.cluster_dict:
                 self.cluster_dict[key] = []
-                cluster_dict_user_id[key] = []
+                self.cluster_dict_user_id[key] = []
             self.cluster_dict[key].append(value)
-            cluster_dict_user_id[key].append(UID)
+            self.cluster_dict_user_id[key].append(UID)
 
         # print(self.cluster_dict)
-        print(f"Clusters: {cluster_dict_user_id}")
-        self.clusters_list.append(list(cluster_dict_user_id.values()))
+        print(f"Clusters: {self.cluster_dict_user_id}")
+        self.clusters_list.append(list(self.cluster_dict_user_id.values()))
 
 
     # Save loss, accurancy to h5 fiel
@@ -295,7 +312,7 @@ class Fedmem():
         
         print(file)
        
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"h5"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" + str(self.num_users) + "/" +"h5"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -304,10 +321,12 @@ class Fedmem():
 
 
         with h5py.File(self.current_directory + "/results/" + directory_name + "/" + '{}.h5'.format(file), 'w') as hf:
+            hf.create_dataset('exp_no', data=self.exp_no)
             hf.create_dataset('Global rounds', data=self.num_glob_iters)
             hf.create_dataset('Local iters', data=self.local_iters)
             hf.create_dataset('Learning rate', data=self.learning_rate)
-            hf.create_dataset('Lambda', data=self.lamda)
+            hf.create_dataset('Lambda_1', data=self.lambda_1)
+            hf.create_dataset('Lambda_2', data=self.lambda_2)
             hf.create_dataset('Batch size', data=self.batch_size)
             # hf.create_dataset('clusters', data=self.clusters_list)
             hf.create_dataset('global_test_loss', data=self.global_test_loss)
@@ -336,19 +355,26 @@ class Fedmem():
 
             hf.close()
         
-    def save_global_model(self, t):
+    def save_global_model(self, t): #, cm):
+        # cm_df = pd.DataFrame(cm)
+        file_cm = "_exp_no_" + str(self.exp_no) + "_confusion_matrix" 
         file = "_exp_no_" + str(self.exp_no) + "_model" 
         
         print(file)
        
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"global_model"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" +"global_model"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/models/"+ directory_name):
         # If the directory does not exist, create it
             os.makedirs(self.current_directory + "/models/"+ directory_name)
         
+        if not os.path.exists(self.current_directory + "/models/confusion_matrix/"+ directory_name):
+        # If the directory does not exist, create it
+            os.makedirs(self.current_directory + "/models/confusion_matrix/"+ directory_name)
         torch.save(self.global_model,self.current_directory + "/models/"+ directory_name + "/" + file + ".pt")
-
+        # cm_df.to_csv(self.current_directory + "/models/confusion_matrix/"+ directory_name + "/" + file_cm + ".csv", index=False)
+    
+    
     def save_cluster_model(self, t):
         
 
@@ -356,7 +382,7 @@ class Fedmem():
             file = "_exp_no_" + str(self.exp_no) + "_cluster_model_" + str(cluster)
         
             print(file)
-            directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"cluster_model_" + str(cluster) 
+            directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" +"cluster_model_" + str(cluster) 
             # Check if the directory already exists
             if not os.path.exists(self.current_directory + "/models/"+ directory_name):
             # If the directory does not exist, create it
@@ -373,38 +399,43 @@ class Fedmem():
         precisions = []
         recalls = []
         f1s = []
+        cms = []
         if evaluate_model == 'global':
             for c in self.selected_users:
-                accuracy, loss, precision, recall, f1 = c.test(self.global_model.parameters())
-                # tot_correct.append(ct * 1.0)
-                # num_samples.append(ns)
+                accuracy, loss, precision, recall, f1, cm = c.test(self.global_model.parameters())
+               
                 accs.append(accuracy)
                 losses.append(loss)
                 precisions.append(precision)
                 recalls.append(recall)
                 f1s.append(f1)
+                cms.append(cm)
+            
         elif evaluate_model == 'local':
             for c in self.selected_users:
-                accuracy, loss, precision, recall, f1 = c.test_local()
+                accuracy, loss, precision, recall, f1, cm = c.test_local()
                 accs.append(accuracy)
                 losses.append(loss)
                 precisions.append(precision)
                 recalls.append(recall)
                 f1s.append(f1)
+                cms.append(cm)
         else:
             for clust_id in range(self.num_teams):
                 users = np.array(self.cluster_dict[clust_id])
                 for c in users:
-                    accuracy, loss, precision, recall, f1 = c.test(self.c[clust_id])
+                    accuracy, loss, precision, recall, f1, cm = c.test(self.c[clust_id])
                     accs.append(accuracy)
                     losses.append(loss)
                     precisions.append(precision)
                     recalls.append(recall)
                     f1s.append(f1)
+                    cms.append(cm)
+                    
                     
 
             
-        return accs, losses, precisions, recalls, f1s
+        return accs, losses, precisions, recalls, f1s, cms
 
     def train_error_and_loss(self, evaluate_model):
         accs = []
@@ -413,15 +444,12 @@ class Fedmem():
         if evaluate_model == 'global':
             for c in self.selected_users:
                 accuracy, loss = c.train_error_and_loss(self.global_model.parameters())
-                # tot_correct.append(ct * 1.0)
-                # num_samples.append(ns)
+                
                 accs.append(accuracy)
                 losses.append(loss)
         elif evaluate_model == 'local':
             for c in self.selected_users:
                 accuracy, loss = c.train_error_and_loss_local()
-                # tot_correct.append(ct * 1.0)
-                # num_samples.append(ns)
                 accs.append(accuracy)
                 losses.append(loss)
         else:
@@ -429,8 +457,6 @@ class Fedmem():
                 users = np.array(self.cluster_dict[clust_id])
                 for c in users:
                     accuracy, loss = c.train_error_and_loss(self.c[clust_id])
-                    # tot_correct.append(ct * 1.0)
-                    # num_samples.append(ns)
                     accs.append(accuracy)
                     losses.append(loss)
 
@@ -438,8 +464,9 @@ class Fedmem():
 
 
     def evaluate(self, t):
+        
         evaluate_model = "global"
-        test_accs, test_losses, precisions, recalls, f1s = self.test_error_and_loss(evaluate_model)
+        test_accs, test_losses, precisions, recalls, f1s, cms = self.test_error_and_loss(evaluate_model)
         train_accs, train_losses  = self.train_error_and_loss(evaluate_model)
         
         self.global_train_acc.append(statistics.mean(train_accs))
@@ -449,8 +476,13 @@ class Fedmem():
         self.global_precision.append(statistics.mean(precisions))
         self.global_recall.append(statistics.mean(recalls))
         self.global_f1score.append(statistics.mean(f1s))
-        
-
+        """try:
+            cm_sum
+        except NameError:
+            cm_sum = np.zeros(cms[0].shape)
+        for cm in cms:
+            cm_sum += 1/len(cms)*cm
+"""
 
         print(f"Global Trainning Accurancy: {self.global_train_acc[t]}" )
         print(f"Global Trainning Loss: {self.global_train_loss[t]}")
@@ -467,11 +499,12 @@ class Fedmem():
             if self.global_test_loss[t] < self.minimum_global_loss:
                 self.minimum_global_loss = self.global_test_loss[t]
                 # print(f"new minimum loss of local model at client {self.id} found at global round {t} local epoch {epoch}")
-                self.save_global_model(t)
+                self.save_global_model(t) #, cm_sum)
+                
 
     def evaluate_clusterhead(self, t):
         evaluate_model = "cluster"
-        test_accs, test_losses, precisions, recalls, f1s = self.test_error_and_loss(evaluate_model)
+        test_accs, test_losses, precisions, recalls, f1s, cms = self.test_error_and_loss(evaluate_model)
         train_accs, train_losses  = self.train_error_and_loss( evaluate_model)
         
         self.cluster_train_acc.append(statistics.mean(train_accs))
@@ -481,8 +514,13 @@ class Fedmem():
         self.cluster_precision.append(statistics.mean(precisions))
         self.cluster_recall.append(statistics.mean(recalls))
         self.cluster_f1score.append(statistics.mean(f1s))
-        
-
+        """try:
+            cm_sum
+        except NameError:
+            cm_sum = np.zeros(cms[0].shape)
+        for cm in cms:
+            cm_sum += 1/len(cms)*cm
+        """
 
         print(f"Cluster Trainning Accurancy: {self.cluster_train_acc[t]}" )
         print(f"Cluster Trainning Loss: {self.cluster_train_loss[t]}")
@@ -502,7 +540,7 @@ class Fedmem():
 
     def evaluate_localmodel(self, t):
         evaluate_model = "local"
-        test_accs, test_losses, precisions, recalls, f1s = self.test_error_and_loss(evaluate_model)
+        test_accs, test_losses, precisions, recalls, f1s, cms = self.test_error_and_loss(evaluate_model)
         train_accs, train_losses  = self.train_error_and_loss(evaluate_model)
         
         self.local_train_acc.append(statistics.mean(train_accs))
@@ -512,8 +550,13 @@ class Fedmem():
         self.local_precision.append(statistics.mean(precisions))
         self.local_recall.append(statistics.mean(recalls))
         self.local_f1score.append(statistics.mean(f1s))
-        
-
+        """try:
+            cm_sum
+        except NameError:
+            cm_sum = np.zeros(cms[0].shape)
+        for cm in cms:
+            cm_sum += 1/len(cms)*cm
+        """
 
         print(f"Local Trainning Accurancy: {self.local_train_acc[t]}" )
         print(f"Local Trainning Loss: {self.local_train_loss[t]}")
@@ -544,7 +587,7 @@ class Fedmem():
         ax[1].set_xticks(range(0, self.num_glob_iters, int(self.num_glob_iters/5)))
         ax[1].legend(prop={"size":12})
         
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"plot/personalized"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" + str(self.num_users) + "/plot/personalized"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -552,7 +595,7 @@ class Fedmem():
 
         plt.draw()
        
-        plt.savefig(self.current_directory + "/results/" + directory_name  + "/_global_iters_" + str(self.num_glob_iters) + '.png')
+        plt.savefig(self.current_directory + "/results/" + directory_name  + "/exp_no_" + str(self.exp_no) + "_global_iters_" + str(self.num_glob_iters) + '.png')
 
         # Show the graph
         plt.show()
@@ -579,7 +622,7 @@ class Fedmem():
         ax[1].set_xticks(range(0, self.num_glob_iters, int(self.num_glob_iters/5)))
         ax[1].legend(prop={"size":12})
         
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"plot/cluster"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) +  "/" + str(self.target) + "/" + str(self.num_users) + "/plot/cluster"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -587,7 +630,7 @@ class Fedmem():
 
         plt.draw()
        
-        plt.savefig(self.current_directory + "/results/" + directory_name  + "/_global_iters_" + str(self.num_glob_iters) + '.png')
+        plt.savefig(self.current_directory + "/results/" + directory_name  + "/exp_no_" + str(self.exp_no) + "_global_iters_" + str(self.num_glob_iters) + '.png')
 
         # Show the graph
         plt.show()
@@ -613,7 +656,7 @@ class Fedmem():
         ax[1].set_xticks(range(0, self.num_glob_iters, int(self.num_glob_iters/5)))
         ax[1].legend(prop={"size":12})
         
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"plot/global"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) +  "/" + str(self.target) + "/" + str(self.num_users) + "/" +"plot/global"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -621,7 +664,7 @@ class Fedmem():
 
         plt.draw()
        
-        plt.savefig(self.current_directory + "/results/" + directory_name  + "/_global_iters_" + str(self.num_glob_iters) + '.png')
+        plt.savefig(self.current_directory + "/results/" + directory_name  + "/exp_no_" + str(self.exp_no) + "_global_iters_" + str(self.num_glob_iters) + '.png')
 
         # Show the graph
         plt.show()
@@ -630,7 +673,7 @@ class Fedmem():
     def train(self):
         loss = []
         
-        for t in trange(self.num_glob_iters, desc="Global Rounds :"):
+        for t in trange(self.num_glob_iters, desc=f" exp no : {self.exp_no} number of clients: {self.num_users} Global Rounds :"):
             if t == 0:
                 self.send_global_parameters()
             else:

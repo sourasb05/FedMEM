@@ -61,7 +61,10 @@ class UserAvg():
 
         # Load dataset
         features_folder = '/proj/sourasb-220503/FedMEM/dataset/r3_mem_ResNet50_features'
-        annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/'+ 'Client_ID_' + str(self.id) +'.csv'
+        if args.target == '10':
+            annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/'+ 'Client_ID_' + str(self.id) +'.csv'
+        else:
+            annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/A1/'+ 'Client_ID_' + str(self.id) +'.csv'
         print(annotations_file)
         dataset = FeatureDataset(features_folder, annotations_file)
 

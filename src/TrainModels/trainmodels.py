@@ -10,7 +10,7 @@ import numpy as np
 
 class ResNet50TL(nn.Module):
 
-    def __init__(self):
+    def __init__(self, n_class):
         super(ResNet50TL, self).__init__() 
         resnet = torchvision.models.resnet50(pretrained=True)
         self.avgpool = nn.Sequential(list(resnet.children())[-2])
@@ -19,7 +19,7 @@ class ResNet50TL(nn.Module):
         self.dropout = nn.Dropout(0.5)  # Dropout p=0.5
         self.batchnorm1 = nn.BatchNorm1d(512)
         self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(512, 10)
+        self.fc2 = nn.Linear(512, n_class)
         
     def forward(self, x):
         features_1d = self.avgpool(x)

@@ -8,12 +8,12 @@ from torchvision.models import resnet50
 import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
-from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, confusion_matrix
 import os
 import copy
 import pandas as pd
 import numpy as np
-from src.Optimizer.Optimizer import BBOptimizer
+from src.Optimizer.Optimizer import Fedmem
 from src.utils.data_process import FeatureDataset
 from sklearn.model_selection import train_test_split
 
@@ -33,7 +33,7 @@ class Fedmem_user():
         """
         self.learning_rate = args.alpha
         self.local_iters = args.local_iters
-        self.lamda = args.lamda
+        self.eta = args.eta
         self.global_model_name = args.model_name
         self.algorithm = args.algorithm
         """
@@ -42,14 +42,17 @@ class Fedmem_user():
 
         # Load dataset
         features_folder = '/proj/sourasb-220503/FedMEM/dataset/r3_mem_ResNet50_features'
-        annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/'+ 'Client_ID_' + str(self.id) +'.csv'
+        if args.target == 10:
+            annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/'+ 'Client_ID_' + str(self.id) +'.csv'
+        else:
+            annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/A1/'+ 'Client_ID_' + str(self.id) +'.csv'
         print(annotations_file)
         
 
         dataset = FeatureDataset(features_folder, annotations_file)
 
         # Split dataset into training and validation
-        train_dataset, val_dataset = train_test_split(dataset, test_size=0.25, random_state=42)
+        train_dataset, val_dataset = train_test_split(dataset, test_size=0.25, random_state=self.exp_no)
         self.train_samples = len(train_dataset)
         self.test_samples = len(val_dataset)
 
@@ -102,7 +105,7 @@ class Fedmem_user():
         #                                    {'params': self.local_model.fc2.parameters()}
         #                                ], lr=self.learning_rate, weight_decay=0.001)  # Only optimize the last layer
 
-        self.optimizer = BBOptimizer(self.local_model.parameters(), self.learning_rate,  self.lamda)
+        self.optimizer = Fedmem(self.local_model.parameters(), self.learning_rate, self.eta)
 
 
     #def bb_step(optimizer, grad, step_size):
@@ -159,8 +162,8 @@ class Fedmem_user():
         precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
         recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
         f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
-                
-        return accuracy, validation_loss, precision, recall, f1
+        cm = confusion_matrix(y_true,y_pred)         
+        return accuracy, validation_loss, precision, recall, f1, cm
 
     def test_local(self):
         self.local_model.eval()
@@ -192,8 +195,9 @@ class Fedmem_user():
         precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
         recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
         f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        cm = confusion_matrix(y_true,y_pred)
                 
-        return accuracy, validation_loss, precision, recall, f1
+        return accuracy, validation_loss, precision, recall, f1, cm
 
 
     def train_error_and_loss(self, global_model):
@@ -296,6 +300,7 @@ class Fedmem_user():
         # Calculate metrics
         # accuracy = accuracy_score(y_true, y_pred)
         validation_loss = total_loss / len(self.testloaderfull)
+        cm = confusion_matrix(y_true, y_pred)
         # precision = precision_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
         # recall = recall_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
         # f1 = f1_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
@@ -306,13 +311,17 @@ class Fedmem_user():
             if validation_loss < self.minimum_per_loss:
                 self.minimum_per_loss = validation_loss
                 # print(f"new minimum loss of local model at client {self.id} found at global round {t} local epoch {epoch}")
-                self.save_local_model(epoch, t)
+                self.save_local_model(epoch, cm, t)
+                
                 
         
     
-    def save_local_model(self, iter, t):
+    def save_local_model(self, iter, cm, t):
+        cm_df = pd.DataFrame(cm)
+        
         # file = "per_model_user"+ str(self.id) +"_exp_no_" + str(self.exp_no) + "_LR_" + str(iter) + "_GR_" + str(t) 
         file = "per_model_user_" + str(self.id)
+        file_cm = "cm_user_" + str(self.id)
         #print(file)
        
         directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"local_models"
@@ -320,8 +329,13 @@ class Fedmem_user():
         if not os.path.exists(self.current_directory + "/models/"+ directory_name):
         # If the directory does not exist, create it
             os.makedirs(self.current_directory + "/models/"+ directory_name)
+        if not os.path.exists(self.current_directory + "/models/confusion_matrix/"+ directory_name):
+        # If the directory does not exist, create it
+            os.makedirs(self.current_directory + "/models/confusion_matrix/"+ directory_name)
         
         torch.save(self.local_model,self.current_directory + "/models/"+ directory_name + "/" + file + ".pt")
+        cm_df.to_csv(self.current_directory + "/models/confusion_matrix/"+ directory_name + "/" + file_cm + ".csv", index=False)
+
         # print(f"local model saved at global round :{t} local round :{iter}")
 
     def train(self, cluster_model, t):
@@ -338,6 +352,11 @@ class Fedmem_user():
                 # Forward + backward + optimize
                 outputs = self.local_model(inputs)
                 loss = self.loss(outputs, labels)
+                
+                proximal_term = 0.0
+                for param, c_param in zip(self.local_model.parameters(), cluster_model):
+                    proximal_term += 0.5 * torch.norm(param - c_param) ** 2
+                loss += proximal_term
                 loss.backward()
                 self.optimizer.step(cluster_model)
                 #self.optimizer.step()
