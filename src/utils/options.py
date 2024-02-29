@@ -14,9 +14,9 @@ def args_parser():
     parser.add_argument("--batch_size", type=int, default=124)
     parser.add_argument("--beta", type=float, default=0.3,
                         help="Regularizer for PerMFL")
-    parser.add_argument("--lambda_1", type=float, default=0.0, 
+    parser.add_argument("--lambda_1", type=float, default=0.25, 
                         help="Regularization term lambda_1")
-    parser.add_argument("--lambda_2", type=float, default=0.0, 
+    parser.add_argument("--lambda_2", type=float, default=0.15, 
                         help="Regularization term lambda_2")
     parser.add_argument("--gamma", type=float, default=0.05, 
                         help="regularization term gamma for PerMFL and scale parameter for RBF kernel in Fedmem")
@@ -30,7 +30,7 @@ def args_parser():
     parser.add_argument("--local_iters", type=int, default=10)
     parser.add_argument("--optimizer", type=str, default="SGD")
     
-    parser.add_argument("--times", type=int, default=1, 
+    parser.add_argument("--times", type=int, default=5, 
                         help="running time")
     parser.add_argument("--exp_start", type=int, default=0,
                         help="experiment start no")
@@ -42,11 +42,11 @@ def args_parser():
     parser.add_argument("--total_users", type=int, default=10, 
                         help="total participants")
    
-    parser.add_argument("--num_teams", type=int, default=5,
+    parser.add_argument("--num_teams", type=int, default=3,
                         help="Number of teams")
     parser.add_argument("--p_teams", type=int, default=1,
                         help="number of team selected per global round")
-    parser.add_argument("--group_division", type = int, default=2, help=" 0 : sequential division , 1 : random division , 2 : only one group")
+    parser.add_argument("--cluster", type = str, default="dynamic", choices=["apriori", "dynamic", "random"])
     parser.add_argument("--target", type=int, default=10, choices=[3,10], help="number of target classes")
 
     args = parser.parse_args()

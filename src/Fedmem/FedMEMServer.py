@@ -31,7 +31,6 @@ class Fedmem():
         print(f"total users : {self.total_users}")
         self.num_users = self.total_users * args.users_frac    #selected users
         self.num_teams = args.num_teams
-        self.group_division = args.group_division
         self.total_train_samples = 0
         self.exp_no = exp_no
         self.n_clusters = args.num_teams
@@ -41,6 +40,7 @@ class Fedmem():
         self.current_directory = current_directory
         self.algorithm = args.algorithm
         self.target = args.target
+        self.cluster_type = args.cluster
         self.cluster_dict = {}
         self.clusters_list = []
         self.c = []
@@ -306,6 +306,32 @@ class Fedmem():
         self.clusters_list.append(list(self.cluster_dict_user_id.values()))
 
 
+    def apriori_clusters(self):
+        if self.target == 10:
+            self.cluster_dict_user_id = { 0 : ['50','25','55','28','30'],
+                                     1 : ['18','52','38','34','60','17','16'],
+                                     2 : ['44','53','45','47','57','41','48'],
+                                     3 : ['56','22','37','35'],
+                                     4 : ['19','32','33','23','26','54','61','43','46','49','31','27','39','29','62','42']
+                                    }
+        elif self.target == 3:
+            self.cluster_dict_user_id = { 0 : ['47', '45', '48', '55', '16', '31', '62', '61', '57', '39', '41', '53', '17', '18'],
+                                     1 : ['27','46', '42', '60', '29', '34', '36','23', '43', '30', '25', '28', '44'],
+                                     2 : ['37', '56', '19', '54', '33', '32', '38', '22', '49', '51', '52', '26', '35']
+                                    }
+            
+        self.cluster_dict = {cluster : [] for cluster in self.cluster_dict_user_id}
+
+
+        for cluster, user_ids in self.cluster_dict_user_id.items():
+            for user in self.users:
+                if user.id in user_ids:
+                    self.cluster_dict[cluster].append(user)
+
+        clustered_users_ids = {cluster: [user.id for user in users] for cluster, users in self.cluster_dict.items()}
+        print(f" cluster is created : {clustered_users_ids}")
+
+
     # Save loss, accurancy to h5 fiel
     def save_results(self):
         file = "_exp_no_" + str(self.exp_no) + "_GR_" + str(self.num_glob_iters) + "_BS_" + str(self.batch_size)
@@ -362,7 +388,7 @@ class Fedmem():
         
         print(file)
        
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" +"global_model"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" + str(self.num_users) + "/" +"global_model"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/models/"+ directory_name):
         # If the directory does not exist, create it
@@ -382,7 +408,7 @@ class Fedmem():
             file = "_exp_no_" + str(self.exp_no) + "_cluster_model_" + str(cluster)
         
             print(file)
-            directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" +"cluster_model_" + str(cluster) 
+            directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" + str(self.num_users)  + "/" +"cluster_model_" + str(cluster) 
             # Check if the directory already exists
             if not os.path.exists(self.current_directory + "/models/"+ directory_name):
             # If the directory does not exist, create it
@@ -587,7 +613,7 @@ class Fedmem():
         ax[1].set_xticks(range(0, self.num_glob_iters, int(self.num_glob_iters/5)))
         ax[1].legend(prop={"size":12})
         
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" + str(self.num_users) + "/plot/personalized"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" + self.cluster_type  + "/" + str(self.num_users) + "/plot/personalized"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -622,7 +648,7 @@ class Fedmem():
         ax[1].set_xticks(range(0, self.num_glob_iters, int(self.num_glob_iters/5)))
         ax[1].legend(prop={"size":12})
         
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) +  "/" + str(self.target) + "/" + str(self.num_users) + "/plot/cluster"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) +  "/" + str(self.target) + "/" + self.cluster_type  +  "/" + str(self.num_users) + "/plot/cluster"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -656,7 +682,7 @@ class Fedmem():
         ax[1].set_xticks(range(0, self.num_glob_iters, int(self.num_glob_iters/5)))
         ax[1].legend(prop={"size":12})
         
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) +  "/" + str(self.target) + "/" + str(self.num_users) + "/" +"plot/global"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) +  "/" + str(self.target) + "/" + self.cluster_type  + "/" + str(self.num_users) + "/" +"plot/global"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -673,7 +699,9 @@ class Fedmem():
     def train(self):
         loss = []
         
-        for t in trange(self.num_glob_iters, desc=f" exp no : {self.exp_no} number of clients: {self.num_users} Global Rounds :"):
+        for t in trange(self.num_glob_iters, desc=f" exp no : {self.exp_no} cluster type : {self.cluster_type} number of clients: {self.num_users} Global Rounds :"):
+            
+            
             if t == 0:
                 self.send_global_parameters()
             else:
@@ -695,18 +723,17 @@ class Fedmem():
                         user.train(self.c[clust_id], t)
 
 
-            similarity_matrix = self.similarity_check()
-            # print(f"similarity_matrix : {similarity_matrix}")
+            if self.cluster_type == "dynamic":
+                similarity_matrix = self.similarity_check()
+                clusters = self.spectral(similarity_matrix, self.n_clusters).tolist()
+                print(clusters)
+                self.combine_cluster_user(clusters)
             
-            #clustering
+            
+            elif self.cluster_type == "apriori":
+                self.apriori_clusters()
+                
 
-            # cluters = kmeans(similarity_matrix)
-            # spectral cluster
-
-            clusters = self.spectral(similarity_matrix, self.n_clusters).tolist()
-
-            print(clusters)
-            self.combine_cluster_user(clusters)
 
             self.aggregate_clusterhead()
             self.global_update()
@@ -717,6 +744,6 @@ class Fedmem():
             self.evaluate(t)
 
         self.save_results()
-        self.plot_per_result()
-        self.plot_cluster_result()
-        self.plot_global_result()
+        # self.plot_per_result()
+        # self.plot_cluster_result()
+        # self.plot_global_result()

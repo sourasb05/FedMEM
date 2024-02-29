@@ -36,6 +36,7 @@ class Fedmem_user():
         self.eta = args.eta
         self.global_model_name = args.model_name
         self.algorithm = args.algorithm
+        self.cluster_type = args.cluster
         """
         DataLoaders
         """
@@ -324,7 +325,7 @@ class Fedmem_user():
         file_cm = "cm_user_" + str(self.id)
         #print(file)
        
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"local_models"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + self.cluster_type  +  "/" +"local_models"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/models/"+ directory_name):
         # If the directory does not exist, create it

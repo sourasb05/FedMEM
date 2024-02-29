@@ -306,7 +306,7 @@ def average_result(path,directory_name, algorithm, avg_file):
     i=0
     train_loss, train_accuracy, test_loss, test_accuracy = [], [], [], []
 
-    if algorithm in [ "FedavgGD", "FedavgSGD", "FedavgPGD", "FedavgPSGD", "Fedprox", "Fedfw", "Feddr" ]:
+    if algorithm in [ "Fedmem", "", "FedavgPGD", "FedavgPSGD", "Fedprox", "Fedfw", "Feddr" ]:
         for file_name in dir_list:
             
             

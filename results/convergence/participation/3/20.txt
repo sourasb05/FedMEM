@@ -1,0 +1,24 @@
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+Client participation :20
+Global training loss (mean/std) : (1.0286945712566375 / 0.011632911278786398)
+Global training accuracy (mean/std) : (0.526146124267064 / 0.007151105165491488)
+Global test loss (mean/std) : (1.033253347277641 / 0.012042260670518912)
+Global test accuracy (mean/std) : (0.513618143402713 / 0.012022000117239383)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
+Personalized training loss (mean/std) : (0.7993116706609726 / 0.004992823931719453)
+Personalized training accuracy (mean/std) : (0.7778117886478235 / 0.007429679572943177)
+Personalized test loss (mean/std) : (0.9295475393533706 / 0.009846467776269376)
+Personalized test accuracy (mean/std) : (0.591967943618465 / 0.011440415609730735)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
+Global Precision (mean/std) : (0.5561152959996822 / 0.02125041993134151)
+Global Recall (mean/std) : (0.513618143402713 / 0.012022000117239383)
+Global F1Score (mean/std) : (0.4635809048038528 / 0.006073370059632222)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
+Personalized Precision (mean/std) : (0.5896476641351965 / 0.014872621284500492)
+Personalized Recall (mean/std) : (0.6049743435814453 / 0.014923937213158607)
+Personalized F1Score (mean/std) : (0.5791886772830726 / 0.017072476145599234)
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+
