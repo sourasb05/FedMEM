@@ -2,7 +2,8 @@ from src.Fedavg.FedAvgServer import FedAvg
 #from src.PerMFL.PerMFLServer import PerMFL
 from src.Fedmem.FedMEMServer import Fedmem
 from src.FedProx.FedProxServer import FedProx
-#from src.FeSEM.FeSEM_server import FeSEM
+from src.pFedme.pFedme_server import pFedme
+from src.FeSEM.FeSEM_server import FeSEM
 #from src.DemLearn.FLAlgorithms.servers.serverDemLearn import DemLearn
 # from src.Optimizer.Optimizer import PerMFL
 from src.TrainModels.trainmodels import *
@@ -35,7 +36,7 @@ def main(args):
             elif(args.model_name == "AMemNetModel"):
                 model = AMemNetModel().to(device)
             else:
-                model = ResNet50TL().to(device)
+                model = ResNet50TL(args.target).to(device)
         except ValueError:
             raise ValueError("Wrong model selected")
         try:    
@@ -43,12 +44,12 @@ def main(args):
                 server = FedAvg(device, model, args,i, current_directory)
             elif args.algorithm == "FedProx":
                 server = FedProx(device, model, args,i, current_directory)
-            elif args.algorithm == "PerMFL":
-                server = PerMFL(device, model, args, i, current_directory)
+            elif args.algorithm == "pFedme":
+                server = pFedme(device, model, args, i, current_directory)
             elif args.algorithm == "Fedmem":
                 server = Fedmem(device, model, args, i, current_directory)
             elif args.algorithm == "FeSEM":
-                server = FeSEM(device, args, i, current_directory)
+                server = FeSEM(device, model, args, i, current_directory)
             # elif args.algorithm == "DemLearn":
             #    server = DemLearn(device, args, i , current_directory)
             
@@ -68,13 +69,16 @@ if __name__ == "__main__":
     print("alpha       : {}".format(args.alpha))
     print("beta        : {}".format(args.beta))
     print("gamma       : {}".format(args.gamma))
-    print("lamda       : {}".format(args.lamda))
+    print("lambda_1       : {}".format(args.lambda_1))
+    print("lambda_2       : {}".format(args.lambda_2))
     print("number of teams : {}".format(args.num_teams))
+    print("Cluster type: {}".format(args.cluster))
     print("eta         : {}".format(args.eta))
     print("Number of global rounds       : {}".format(args.num_global_iters))
     print("Number of team rounds          : {}".format(args.num_team_iters))
     print("Number of local rounds       : {}".format(args.local_iters))
     print("Local Model       : {}".format(args.model_name))
+
     print("=" * 80)
 
     

@@ -24,20 +24,19 @@ class FedProx():
         self.local_iters = args.local_iters
         self.batch_size = args.batch_size
         self.learning_rate = args.alpha
-        self.lamda = args.lamda
+        self.lamda = args.lambda_1
         self.user_ids = args.user_ids
         print(f"user ids : {self.user_ids}")
         self.total_users = len(self.user_ids)
         print(f"total users : {self.total_users}")
         self.num_users = self.total_users * args.users_frac    #selected users
         self.num_teams = args.num_teams
-        self.group_division = args.group_division
         self.total_train_samples = 0
         self.exp_no = exp_no
         self.n_clusters = args.num_teams
         self.algorithm = args.algorithm
         self.current_directory = current_directory
-
+        self.target = args.target
         """
         Global model
         
@@ -65,7 +64,7 @@ class FedProx():
 
         for i in trange(self.total_users, desc="Data distribution to clients"):
             # id, train, test = read_user_data(i, data)
-            user = UserProx(device, model, args, int(self.user_ids[i]))
+            user = UserProx(device, model, args, int(self.user_ids[i]), exp_no)
             self.users.append(user)
             self.total_train_samples += user.train_samples
 
@@ -138,28 +137,6 @@ class FedProx():
             # print("number of selected users are greater than total users")
     
 
-
-    def train(self):
-        loss = []
-        
-        for glob_iter in trange(self.num_glob_iters, desc="Global Rounds"):
-            self.send_parameters()
-            self.selected_users = self.select_users(glob_iter, self.num_users)
-            list_user_id = []
-            for user in self.selected_users:
-                list_user_id.append(user.id)
-            print(f"Exp no{self.exp_no} : users selected for global iteration {glob_iter} are : {list_user_id}")
-
-            for user in tqdm(self.selected_users, desc="running clients"):
-                user.train(self.global_model)  # * user.train_samples
-
-            self.aggregate_parameters()
-            # self.save_global_model(glob_iter)
-            self.evaluate(glob_iter)
-            self.save_model(glob_iter)
-        self.save_results()
-        
-        self.plot_result()
 
     
     def test_error_and_loss(self):
@@ -259,7 +236,7 @@ class FedProx():
         
         print(file)
        
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"h5"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"h5" + "/" + str(self.target)
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -281,6 +258,9 @@ class FedProx():
             hf.create_dataset('global_train_loss', data=self.global_train_loss)
             hf.create_dataset('global_test_accuracy', data=self.global_test_acc)
             hf.create_dataset('global_train_accuracy', data=self.global_train_acc)
+            hf.create_dataset('global_precision', data=self.global_precision)
+            hf.create_dataset('global_recall', data=self.global_recall)
+            hf.create_dataset('global_f1score', data=self.global_f1score)
             
             hf.close()
 
@@ -296,3 +276,27 @@ class FedProx():
             os.makedirs(self.current_directory + "/models/"+ directory_name)
         
         torch.save(self.global_model,self.current_directory + "/models/"+ directory_name + "/" + file + ".pt")
+
+
+    def train(self):
+        loss = []
+        
+        for glob_iter in trange(self.num_glob_iters, desc=f" Exp no {self.exp_no} : Global Rounds"):
+            self.send_parameters()
+            self.selected_users = self.select_users(glob_iter, self.num_users)
+            list_user_id = []
+            for user in self.selected_users:
+                list_user_id.append(user.id)
+            print(f"Exp no{self.exp_no} : users selected for global iteration {glob_iter} are : {list_user_id}")
+
+            for user in tqdm(self.selected_users, desc="running clients"):
+                user.train(self.global_model)  # * user.train_samples
+
+            self.aggregate_parameters()
+            # self.save_global_model(glob_iter)
+            self.evaluate(glob_iter)
+            # self.save_model(glob_iter)
+        self.save_results()
+        
+        #self.plot_result()
+

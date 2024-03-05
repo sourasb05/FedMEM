@@ -6,23 +6,26 @@ def args_parser():
     
     parser.add_argument("--model_name", type=str, default="ResNet50TL", choices=["SimpleCNN", "AMemNetModel", "ResNet50TL"])
     
-    parser.add_argument("--algorithm", type=str, default="Fedmem",
-                        choices=["PerMFL", "FedAvg", "Fedmem", "FeSEM", "FedProx"])
+    parser.add_argument("--algorithm", type=str, default="FeSEM",
+                        choices=["pFedme", "FedAvg", "Fedmem", "FeSEM", "FedProx"])
     parser.add_argument("--user_ids", type=list, default=['16','17','18','19','22','23','25','26','27',\
     '28','29','30','31','32','33','34','35','36','37','38','39','41','42','43','44','45','46','47','48','49','51','52','53','54','55','56','57','60','61','62'])
 
-    parser.add_argument("--batch_size", type=int, default=124)
-    parser.add_argument("--beta", type=float, default=0.3,
-                        help="Regularizer for PerMFL")
-    parser.add_argument("--lambda_1", type=float, default=0.25, 
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--beta", type=float, default=0.7,
+                        help="Regularizer for pFedme")
+    parser.add_argument("--K", type=int, default=30,
+                        help="Regularizer for pFedme")
+    
+    parser.add_argument("--lambda_1", type=float, default=0.75, 
                         help="Regularization term lambda_1")
     parser.add_argument("--lambda_2", type=float, default=0.15, 
                         help="Regularization term lambda_2")
     parser.add_argument("--gamma", type=float, default=0.05, 
                         help="regularization term gamma for PerMFL and scale parameter for RBF kernel in Fedmem")
-    parser.add_argument("--alpha", type=float, default=0.01, 
+    parser.add_argument("--alpha", type=float, default=0.05, 
                         help="learning rate for local models in fedmem")
-    parser.add_argument("--eta", type=float, default=0.0005, 
+    parser.add_argument("--eta", type=float, default=0.01, 
                         help="personalization parameter for Fedmem")
     
     parser.add_argument("--num_global_iters", type=int, default=50)
@@ -37,7 +40,7 @@ def args_parser():
     parser.add_argument("--gpu", type=int, default=0,
                         help="Which GPU to run the experiments, -1 mean CPU, 0,1,2 for GPU")
     
-    parser.add_argument("--users_frac", type=float, default=1.0, 
+    parser.add_argument("--users_frac", type=float, default=0.2, 
                         help="selected fraction of users available per global round")
     parser.add_argument("--total_users", type=int, default=10, 
                         help="total participants")

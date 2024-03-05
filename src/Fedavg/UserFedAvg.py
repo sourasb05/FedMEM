@@ -12,7 +12,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_sc
 
 class UserAvg():
 
-    def __init__(self,device, model, args, id):
+    def __init__(self,device, model, args, id, exp_no):
 
         self.device = device
         
@@ -61,7 +61,7 @@ class UserAvg():
 
         # Load dataset
         features_folder = '/proj/sourasb-220503/FedMEM/dataset/r3_mem_ResNet50_features'
-        if args.target == '10':
+        if args.target == 10:
             annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/'+ 'Client_ID_' + str(self.id) +'.csv'
         else:
             annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/A1/'+ 'Client_ID_' + str(self.id) +'.csv'
@@ -69,7 +69,7 @@ class UserAvg():
         dataset = FeatureDataset(features_folder, annotations_file)
 
         # Split dataset into training and validation
-        train_dataset, val_dataset = train_test_split(dataset, test_size=0.25, random_state=42)
+        train_dataset, val_dataset = train_test_split(dataset, test_size=0.25, random_state=exp_no)
         self.train_samples = len(train_dataset)
         self.test_samples = len(val_dataset)
 
@@ -138,6 +138,70 @@ class UserAvg():
         f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
                 
         return accuracy, validation_loss, precision, recall, f1
+
+    def test_local(self):
+        self.local_model.eval()
+        # self.update_parameters(global_model)
+        y_true = []
+        y_pred = []
+        
+        total_loss = 0.0
+        with torch.no_grad():  # Inference mode, gradients not needed
+            for inputs, labels in self.testloaderfull:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                outputs = self.local_model(inputs)
+                loss = self.loss(outputs, labels)
+                total_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                # total += labels.size(0)
+                # correct += (predicted == labels).sum().item()
+                y_true.extend(labels.cpu().numpy())  # Collect true labels
+                y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
+
+        # Convert collected labels to numpy arrays for metric calculation
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+    
+        # Calculate metrics
+        accuracy = accuracy_score(y_true, y_pred)
+        validation_loss = total_loss / len(self.testloaderfull)
+        precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+        f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
+                
+        return accuracy, validation_loss, precision, recall, f1
+
+
+
+    def train_error_and_loss_local(self):
+        self.local_model.eval()
+        y_true = []
+        y_pred = []
+        
+        total_loss = 0.0
+        # self.update_parameters(global_model)
+        
+        with torch.no_grad():  # Inference mode, gradients not needed
+            for inputs, labels in self.trainloaderfull:
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
+                outputs = self.local_model(inputs)
+                loss = self.loss(outputs, labels)
+                total_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                # total += labels.size(0)
+                # correct += (predicted == labels).sum().item()
+                y_true.extend(labels.cpu().numpy())  # Collect true labels
+                y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
+
+        # Convert collected labels to numpy arrays for metric calculation
+        y_true = np.array(y_true)
+        y_pred = np.array(y_pred)
+    
+        # Calculate metrics
+        accuracy = accuracy_score(y_true, y_pred)
+        train_loss = total_loss / len(self.testloaderfull)
+                
+        return accuracy, train_loss
 
     def train_error_and_loss(self, global_model):
         self.local_model.eval()

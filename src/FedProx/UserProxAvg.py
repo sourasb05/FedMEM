@@ -12,7 +12,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_sc
 
 class UserProx():
 
-    def __init__(self,device, model, args, id):
+    def __init__(self,device, model, args, id, exp_no):
 
         self.device = device
         
@@ -24,7 +24,7 @@ class UserProx():
         Hyperparameters
         """
         self.learning_rate = args.alpha
-        self.lamda = args.lamda
+        self.lamda = args.lambda_1
         self.local_iters = args.local_iters
         
         # those parameters are for persionalized federated learing.
@@ -61,13 +61,18 @@ class UserProx():
 
 
         # Load dataset
+        # Load dataset
         features_folder = '/proj/sourasb-220503/FedMEM/dataset/r3_mem_ResNet50_features'
-        annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/'+ 'Client_ID_' + str(self.id) +'.csv'
+        if args.target == 10:
+            annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/'+ 'Client_ID_' + str(self.id) +'.csv'
+        else:
+            annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/A1/'+ 'Client_ID_' + str(self.id) +'.csv'
         print(annotations_file)
+        
         dataset = FeatureDataset(features_folder, annotations_file)
 
         # Split dataset into training and validation
-        train_dataset, val_dataset = train_test_split(dataset, test_size=0.25, random_state=42)
+        train_dataset, val_dataset = train_test_split(dataset, test_size=0.25, random_state=exp_no)
         self.train_samples = len(train_dataset)
         self.test_samples = len(val_dataset)
 

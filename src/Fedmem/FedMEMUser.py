@@ -354,10 +354,10 @@ class Fedmem_user():
                 outputs = self.local_model(inputs)
                 loss = self.loss(outputs, labels)
                 
-                proximal_term = 0.0
-                for param, c_param in zip(self.local_model.parameters(), cluster_model):
-                    proximal_term += 0.5 * torch.norm(param - c_param) ** 2
-                loss += proximal_term
+                # proximal_term = 0.0
+                # for param, c_param in zip(self.local_model.parameters(), cluster_model):
+                #    proximal_term += 0.5 * torch.norm(param - c_param) ** 2
+                # loss += proximal_term
                 loss.backward()
                 self.optimizer.step(cluster_model)
                 #self.optimizer.step()

@@ -44,6 +44,7 @@ class Fedmem():
         self.cluster_dict = {}
         self.clusters_list = []
         self.c = []
+        self.cluster_dict_user_id = {}
         #self.c = [[] for _ in range(args.num_teams)]
 
 
@@ -124,7 +125,8 @@ class Fedmem():
     def send_cluster_parameters(self):
         for clust_id in range(self.num_teams):
             users = np.array(self.cluster_dict[clust_id])
-            print(f"cluster {clust_id} model has been sent to {len(users)} users")
+            users_id = np.array(self.cluster_dict_user_id[clust_id])
+            print(f"cluster {clust_id} model has been sent to {len(users_id)} users {users_id}")
             if len(users) != 0:
                 #for param in self.c[clust_id]:
                     # print(f" cluster {clust_id} parameters :{param.data}")
@@ -287,21 +289,46 @@ class Fedmem():
         kmeans = KMeans(n_clusters=n_clusters)
         kmeans.fit(eigenvectors)
         return kmeans.labels_
+    
+
+    def reassign_to_new_cluster(self, key, value):
+        found_key = None
+        print(f"client_id : {value.id}")
+
+        # Now, add the value to the new key
+        if key not in self.cluster_dict:
+            self.cluster_dict[key] = []
+            self.cluster_dict_user_id[key] = []
+    
+        # Search for the value in the dictionary
+        for k, values in self.cluster_dict.items():
+            if value in values:
+                found_key = k
+                print(f"found key {found_key} for value {value.id}")
+                # input("press")
+            
+                self.cluster_dict[found_key].remove(value)
+                self.cluster_dict_user_id[found_key].remove(value.id)
+                print(self.cluster_dict_user_id)
+                # input("press")
+                break
+
+        self.cluster_dict[key].append(value)
+        self.cluster_dict_user_id[key].append(value.id)
+        return found_key  # return the original key if the value was reassigned
+
+
               
     def combine_cluster_user(self,clusters):
-        self.cluster_dict = {}
-        self.cluster_dict_user_id = {}
+        
         user_ids = []
         for user in self.selected_users:
             user_ids.append(user.id)
-        for key, value, UID in zip(clusters, self.selected_users, user_ids):
-            if key not in self.cluster_dict:
-                self.cluster_dict[key] = []
-                self.cluster_dict_user_id[key] = []
-            self.cluster_dict[key].append(value)
-            self.cluster_dict_user_id[key].append(UID)
+        for key, value, in zip(clusters, self.selected_users):
+            original_key = self.reassign_to_new_cluster(key, value)
+            if original_key is not None:
+                print(f"Value {value.id} reassigned from {original_key} to {key}.")
 
-        # print(self.cluster_dict)
         print(f"Clusters: {self.cluster_dict_user_id}")
         self.clusters_list.append(list(self.cluster_dict_user_id.values()))
 
@@ -338,7 +365,7 @@ class Fedmem():
         
         print(file)
        
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" + str(self.num_users) + "/" +"h5"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" + "h5"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -540,14 +567,7 @@ class Fedmem():
         self.cluster_precision.append(statistics.mean(precisions))
         self.cluster_recall.append(statistics.mean(recalls))
         self.cluster_f1score.append(statistics.mean(f1s))
-        """try:
-            cm_sum
-        except NameError:
-            cm_sum = np.zeros(cms[0].shape)
-        for cm in cms:
-            cm_sum += 1/len(cms)*cm
-        """
-
+        
         print(f"Cluster Trainning Accurancy: {self.cluster_train_acc[t]}" )
         print(f"Cluster Trainning Loss: {self.cluster_train_loss[t]}")
         print(f"Cluster test accurancy: {self.cluster_test_acc[t]}")
@@ -695,7 +715,13 @@ class Fedmem():
         # Show the graph
         plt.show()
         
-    
+    def find_cluster_id(self, user_id):
+        for key, values in self.cluster_dict_user_id.items():
+            if user_id in values:
+                return key
+        return None
+
+
     def train(self):
         loss = []
         
@@ -711,20 +737,18 @@ class Fedmem():
             list_user_id = []
             for user in self.selected_users:
                 list_user_id.append(user.id)
+            print(f"selected users : {list_user_id}")
 
-            if t == 0:
-                for user in tqdm(self.selected_users, desc="running selected clients"):
-                    user.train(self.global_model.parameters(), t)  # * user.train_samples
-            else:
-                for clust_id in range(self.num_teams):
-                    users = np.array(self.cluster_dict[clust_id])
-                    for user in tqdm(users, desc=f"running cluster {clust_id}"):
-                        
-                        user.train(self.c[clust_id], t)
-
+            for user in tqdm(self.selected_users, desc=f"total selected users {len(self.selected_users)}"):
+                clust_id = self.find_cluster_id(user.id)
+                if clust_id is not None:
+                    user.train(self.c[clust_id], t)
+                else:
+                    user.train(self.global_model.parameters(), t)
 
             if self.cluster_type == "dynamic":
                 similarity_matrix = self.similarity_check()
+                # print(similarity_matrix)
                 clusters = self.spectral(similarity_matrix, self.n_clusters).tolist()
                 print(clusters)
                 self.combine_cluster_user(clusters)

@@ -1,0 +1,1 @@
+interactive --gpus=1 -t 01:00:00

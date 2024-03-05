@@ -29,11 +29,11 @@ class FedAvg():
         print(f"total users : {self.total_users}")
         self.num_users = self.total_users * args.users_frac    #selected users
         self.num_teams = args.num_teams
-        self.group_division = args.group_division
         self.total_train_samples = 0
         self.exp_no = exp_no
         self.n_clusters = args.num_teams
         self.algorithm = args.algorithm
+        self.target = args.target
         self.current_directory = current_directory
         """
         Global model
@@ -62,7 +62,7 @@ class FedAvg():
 
         for i in trange(self.total_users, desc="Data distribution to clients"):
             # id, train, test = read_user_data(i, data)
-            user = UserAvg(device, model, args, int(self.user_ids[i]))
+            user = UserAvg(device, model, args, int(self.user_ids[i]), exp_no)
             self.users.append(user)
             self.total_train_samples += user.train_samples
 
@@ -134,32 +134,6 @@ class FedAvg():
             assert (self.subset_users > len(self.users))
             # print("number of selected users are greater than total users")
     
-
-
-    def train(self):
-        loss = []
-        
-        for glob_iter in trange(self.num_glob_iters, desc="Global Rounds"):
-            self.send_parameters()
-            self.selected_users = self.select_users(glob_iter, self.num_users)
-            
-            list_user_id = []
-            for user in self.selected_users:
-                list_user_id.append(user.id)
-            print(f"Exp no{self.exp_no} : users selected for global iteration {glob_iter} are : {list_user_id}")
-
-            for user in tqdm(self.selected_users, desc="running clients"):
-                user.train()  # * user.train_samples
-
-            self.aggregate_parameters()
-            # self.save_global_model(glob_iter)
-            self.evaluate(glob_iter)
-            self.save_model(glob_iter)
-        self.save_results()
-        
-        self.plot_result()
-
-    
     def test_error_and_loss(self):
         
         accs = []
@@ -190,12 +164,69 @@ class FedAvg():
 
         
         return accs, losses
+    
+    def test_error_and_loss_local(self):
+        
+        accs = []
+        losses = []
+        precisions = []
+        recalls = []
+        f1s = []
+        
+        for c in self.users:
+            accuracy, loss, precision, recall, f1 = c.test_local()
+            # tot_correct.append(ct * 1.0)
+            # num_samples.append(ns)
+            accs.append(accuracy)
+            losses.append(loss)
+            precisions.append(precision)
+            recalls.append(recall)
+            f1s.append(f1)
+            
+        return accs, losses, precisions, recalls, f1s
 
+
+
+    def train_error_and_loss_local(self):
+        accs = []
+        losses = []
+        for c in self.users:
+            accuracy, loss = c.train_error_and_loss_local()
+            accs.append(accuracy)
+            losses.append(loss)
+
+        
+        return accs, losses
 
     def evaluate(self, t):
 
         test_accs, test_losses, precisions, recalls, f1s = self.test_error_and_loss()
         train_accs, train_losses  = self.train_error_and_loss()
+        
+
+        self.global_train_acc.append(statistics.mean(train_accs))
+        self.global_test_acc.append(statistics.mean(test_accs))
+        self.global_train_loss.append(statistics.mean(train_losses))
+        self.global_test_loss.append(statistics.mean(test_losses))
+        self.global_precision.append(statistics.mean(precisions))
+        self.global_recall.append(statistics.mean(recalls))
+        self.global_f1score.append(statistics.mean(f1s))
+        
+
+        print(f"Global Trainning Accurancy: {self.global_train_acc[t]}" )
+        print(f"Global Trainning Loss: {self.global_train_loss[t]}")
+        print(f"Global test accurancy: {self.global_test_acc[t]}")
+        print(f"Global test_loss: {self.global_test_loss[t]}")
+        print(f"Global Precision: {self.global_precision[t]}")
+        print(f"Global Recall: {self.global_recall[t]}")
+        print(f"Global f1score: {self.global_f1score[t]}")
+
+
+
+    def evaluate_local(self, t):
+
+        test_accs, test_losses, precisions, recalls, f1s = self.test_error_and_loss_local()
+        train_accs, train_losses  = self.train_error_and_loss_local()
         
 
         self.global_train_acc.append(statistics.mean(train_accs))
@@ -253,11 +284,11 @@ class FedAvg():
         # Save loss, accurancy to h5 fiel
     def save_results(self):
        
-        file = "_exp_no_" + str(self.exp_no) + "_GR_" + str(self.num_glob_iters) + "_BS_" + str(self.batch_size)
-        
+        #file = "_exp_no_" + str(self.exp_no) + "_GR_" + str(self.num_glob_iters) + "_BS_" + str(self.batch_size)
+        file = "_exp_no_" + str(self.exp_no) + "_local_model_LR_" + str(self.local_iters)
         print(file)
        
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"h5"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" +"h5" + "/local_model/" + str(self.target)
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -278,6 +309,9 @@ class FedAvg():
             hf.create_dataset('global_train_loss', data=self.global_train_loss)
             hf.create_dataset('global_test_accuracy', data=self.global_test_acc)
             hf.create_dataset('global_train_accuracy', data=self.global_train_acc)
+            hf.create_dataset('global_precision', data=self.global_precision)
+            hf.create_dataset('global_recall', data=self.global_recall)
+            hf.create_dataset('global_f1score', data=self.global_f1score)
             
             hf.close()
 
@@ -293,3 +327,30 @@ class FedAvg():
             os.makedirs(self.current_directory + "/models/"+ directory_name)
         
         torch.save(self.global_model,self.current_directory + "/models/"+ directory_name + "/" + file + ".pt")
+
+
+
+
+    def train(self):
+        loss = []
+        
+        for glob_iter in trange(self.num_glob_iters, desc="Global Rounds"):
+            self.send_parameters()
+            self.selected_users = self.select_users(glob_iter, self.num_users)
+            
+            list_user_id = []
+            for user in self.selected_users:
+                list_user_id.append(user.id)
+            print(f"Exp no{self.exp_no} : users selected for global iteration {glob_iter} are : {list_user_id}")
+
+            for user in tqdm(self.selected_users, desc="running clients"):
+                user.train()  # * user.train_samples
+
+            # self.aggregate_parameters()
+            # self.save_global_model(glob_iter)
+            #self.evaluate(glob_iter)
+            self.evaluate_local(glob_iter)
+            #self.save_model(glob_iter)
+        self.save_results()
+        
+        #self.plot_result()
