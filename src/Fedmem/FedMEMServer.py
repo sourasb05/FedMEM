@@ -16,6 +16,7 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import statistics
 
+
 class Fedmem():
     def __init__(self,device, model, args, exp_no, current_directory):
                 
@@ -41,11 +42,17 @@ class Fedmem():
         self.algorithm = args.algorithm
         self.target = args.target
         self.cluster_type = args.cluster
+        self.data_silo = args.data_silo
+        self.fix_client_every_GR = args.fix_client_every_GR
+        self.fixed_user_id = args.fixed_user_id
+
+        print(f"self.fixed_user_id : {self.fixed_user_id}")
         self.cluster_dict = {}
         self.clusters_list = []
         self.c = []
         self.cluster_dict_user_id = {}
         #self.c = [[] for _ in range(args.num_teams)]
+        self.top_accuracies = []
 
 
         """
@@ -114,7 +121,10 @@ class Fedmem():
             self.users.append(user)
             self.total_train_samples += user.train_samples
 
-        print("Finished creating Fedmem server.")
+            if self.user_ids[i] == str(self.fixed_user_id):
+                self.fixed_user = user
+                print(f'id found : {self.fixed_user.id}')
+        # print("Finished creating Fedmem server.")
 
         
     def send_global_parameters(self):
@@ -126,7 +136,7 @@ class Fedmem():
         for clust_id in range(self.num_teams):
             users = np.array(self.cluster_dict[clust_id])
             users_id = np.array(self.cluster_dict_user_id[clust_id])
-            print(f"cluster {clust_id} model has been sent to {len(users_id)} users {users_id}")
+            # print(f"cluster {clust_id} model has been sent to {len(users_id)} users {users_id}")
             if len(users) != 0:
                 #for param in self.c[clust_id]:
                     # print(f" cluster {clust_id} parameters :{param.data}")
@@ -145,10 +155,10 @@ class Fedmem():
         for cluster_model in self.c:
             self.add_parameters(cluster_model, 1/len(self.c))
 
-    def add_parameters_clusters(self, user, ratio, cluster_id):
+    def add_parameters_clusters(self, user, cluster_id):
         
         for cluster_param, user_param in zip(self.c[cluster_id], user.get_parameters()):
-            cluster_param.data = cluster_param.data + ratio*user_param.data.clone() 
+            cluster_param.data = cluster_param.data + user.ratio * user_param.data.clone() 
         for cluster_param , global_param in zip(self.c[cluster_id], self.global_model.parameters()):
             cluster_param.data += self.eta*(cluster_param.data - global_param.data)
 
@@ -163,17 +173,32 @@ class Fedmem():
             users = np.array(self.cluster_dict[clust_id])
             # print(users)
             # input("press")
-            print(f"number of users are {len(users)} in cluster {clust_id} ")
+            # print(f"number of users are {len(users)} in cluster {clust_id} ")
             if len(users) != 0:
                 for user in users:
-                    self.add_parameters_clusters(user, 1/len(users), clust_id)
+                    self.add_parameters_clusters(user, clust_id)
 
 
     def select_users(self, round, subset_users):
         np.random.seed(round)
         return np.random.choice(self.users, subset_users, replace=False)
 
-        
+
+    def select_n_1_users(self, round, subset_users):
+        # Filter out the permanent user from the list of users
+        print(f"fixed client : {self.fixed_user.id}")
+        filtered_users = [user for user in self.users if user != self.fixed_user]
+    
+        # Set the random seed for reproducibility
+        np.random.seed(round)
+    
+        # Perform random selection from the filtered list of users
+        selected_users = np.random.choice(filtered_users, subset_users, replace=False).tolist()
+        selected_users.append(self.fixed_user)
+        return selected_users
+
+
+
     def pearson_correlation(self, tensor1, tensor2):
         mean1, mean2 = torch.mean(tensor1), torch.mean(tensor2)
         numerator = torch.sum((tensor1 - mean1) * (tensor2 - mean2))
@@ -223,7 +248,7 @@ class Fedmem():
             
             for key, values in self.cluster_dict.items():
                 if user in values:
-                    print(f"user {user.id} is in cluster {key}")
+                    # print(f"user {user.id} is in cluster {key}")
                     clust_id = key
                     break
             
@@ -293,7 +318,7 @@ class Fedmem():
 
     def reassign_to_new_cluster(self, key, value):
         found_key = None
-        print(f"client_id : {value.id}")
+        # print(f"client_id : {value.id}")
 
         # Now, add the value to the new key
         if key not in self.cluster_dict:
@@ -304,12 +329,12 @@ class Fedmem():
         for k, values in self.cluster_dict.items():
             if value in values:
                 found_key = k
-                print(f"found key {found_key} for value {value.id}")
+                # print(f"found key {found_key} for value {value.id}")
                 # input("press")
             
                 self.cluster_dict[found_key].remove(value)
                 self.cluster_dict_user_id[found_key].remove(value.id)
-                print(self.cluster_dict_user_id)
+                # print(self.cluster_dict_user_id)
                 # input("press")
                 break
 
@@ -326,10 +351,11 @@ class Fedmem():
             user_ids.append(user.id)
         for key, value, in zip(clusters, self.selected_users):
             original_key = self.reassign_to_new_cluster(key, value)
-            if original_key is not None:
-                print(f"Value {value.id} reassigned from {original_key} to {key}.")
+        #    if original_key is not None:
+                # print(f"Value {value.id} reassigned from {original_key} to {key}.")
 
-        print(f"Clusters: {self.cluster_dict_user_id}")
+        # print(f"Clusters: {self.cluster_dict_user_id}")
+        
         self.clusters_list.append(list(self.cluster_dict_user_id.values()))
 
 
@@ -356,21 +382,57 @@ class Fedmem():
                     self.cluster_dict[cluster].append(user)
 
         clustered_users_ids = {cluster: [user.id for user in users] for cluster, users in self.cluster_dict.items()}
-        print(f" cluster is created : {clustered_users_ids}")
+        # print(f" cluster is created : {clustered_users_ids}")
+        
 
+    def save_clusters(self, t):
+        file = "exp_no" + str(self.exp_no) + "_clusters_at_GR_" + str(t)
+        print(file)
+        # directory_name =  "/data_silo_" + str(self.data_silo) + "/" + "target_" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" + str(self.exp_no) + "/" + "h5"
+        
+        directory_name =  "/data_silo_" + str(self.data_silo) + "/" + "fixed_client_" + str(self.fixed_user.id)  + "/" + "target_" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" + "h5"
 
-    # Save loss, accurancy to h5 fiel
+        
+        if not os.path.exists(self.current_directory + "/results/"+ directory_name):
+        # If the directory does not exist, create it
+            os.makedirs(self.current_directory + "/results/" + directory_name)
+        
+        with h5py.File(self.current_directory + "/results/" + directory_name + "/" + '{}.h5'.format(file), 'w') as hf:
+            for key, value in self.cluster_dict_user_id.items():
+                hf.create_dataset(str(key), data=value)
+
     def save_results(self):
-        file = "_exp_no_" + str(self.exp_no) + "_GR_" + str(self.num_glob_iters) + "_BS_" + str(self.batch_size)
+        file = "_exp_no_" + str(self.exp_no) + "_GR_" + str(self.num_glob_iters) + "_BS_" + str(self.batch_size) + "_data_silo_" + str(self.data_silo) + "_num_user_" + str(self.num_users)
         
         print(file)
        
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" + "h5"
+        # directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/data_silo_" + str(self.data_silo) + "/" + "target_" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" "h5"
+        
+        directory_name = "fixed_client_" + str(self.fixed_user.id) + "/target_" + str(self.target)
+
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
             os.makedirs(self.current_directory + "/results/" + directory_name)
-
+        avg_highest_acc = 0
+        accuracy_array = np.array([])
+        each_client_accuracy_array = []
+        each_client_f1_array = []
+        each_client_val_loss_array = []
+        for user in self.users:
+            
+            accuracy_array = np.append(accuracy_array, user.maximum_per_accuracy)
+            # each_client_accuracy_array.append(user.list_accuracy)
+            # each_client_f1_array.append(user.list_f1)
+            # each_client_val_loss_array.append(user.list_val_loss)
+        print(f"len(self.users) : {len(self.users)}")
+        #print(f"each_client_accuracy_array : {each_client_accuracy_array}")
+        #print(f"each_client_f1_array : {each_client_f1_array}")
+        #print(f"each_client_val_loss_array : {each_client_val_loss_array}")
+        
+        
+        avg_highest_acc = np.mean(accuracy_array)
+        std_dev = np.std(accuracy_array, ddof=1) # ddof=1 for sample standard deviation, 0 for population
 
 
         with h5py.File(self.current_directory + "/results/" + directory_name + "/" + '{}.h5'.format(file), 'w') as hf:
@@ -381,6 +443,9 @@ class Fedmem():
             hf.create_dataset('Lambda_1', data=self.lambda_1)
             hf.create_dataset('Lambda_2', data=self.lambda_2)
             hf.create_dataset('Batch size', data=self.batch_size)
+            hf.create_dataset('data silo', data=self.data_silo)
+            hf.create_dataset('num users', data=self.num_users)
+            
             # hf.create_dataset('clusters', data=self.clusters_list)
             hf.create_dataset('global_test_loss', data=self.global_test_loss)
             hf.create_dataset('global_train_loss', data=self.global_train_loss)
@@ -406,6 +471,18 @@ class Fedmem():
             hf.create_dataset('per_recall', data=self.local_recall)
             hf.create_dataset('per_f1score', data=self.local_f1score)
 
+            hf.create_dataset('maximum_per_test_accuracy', data=avg_highest_acc)
+            hf.create_dataset('maximum_per_test_accuracy_list', data=accuracy_array)
+            hf.create_dataset('std_dev', data=std_dev)
+
+            for user in self.users:
+                
+                hf.create_dataset(f'client_{user.id}_accuracy_array', data=np.array(user.list_accuracy))
+                hf.create_dataset(f'client_{user.id}_f1_array', data=np.array(user.list_f1))
+                hf.create_dataset(f'client_{user.id}_val_loss_array', data=np.array(user.list_val_loss))
+            # each_client_accuracy_array.append(user.list_accuracy)
+            # each_client_f1_array.append(user.list_f1)
+            # each_client_val_loss_array.append(user.list_val_loss)
             hf.close()
         
     def save_global_model(self, t): #, cm):
@@ -415,7 +492,8 @@ class Fedmem():
         
         print(file)
        
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/" + str(self.target) + "/" + str(self.num_users) + "/" +"global_model"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/data_silo_" + str(self.data_silo) + "/" + "target_" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" + "h5"
+
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/models/"+ directory_name):
         # If the directory does not exist, create it
@@ -444,7 +522,7 @@ class Fedmem():
             torch.save(self.c[cluster],self.current_directory + "/models/"+ directory_name + "/" + file + ".pt")
 
 
-    def test_error_and_loss(self, evaluate_model):
+    def test_error_and_loss(self, evaluate_model, t):
         # num_samples = []
         # tot_correct = []
         accs = []
@@ -466,7 +544,7 @@ class Fedmem():
             
         elif evaluate_model == 'local':
             for c in self.selected_users:
-                accuracy, loss, precision, recall, f1, cm = c.test_local()
+                accuracy, loss, precision, recall, f1, cm = c.test_local(t)
                 accs.append(accuracy)
                 losses.append(loss)
                 precisions.append(precision)
@@ -519,7 +597,7 @@ class Fedmem():
     def evaluate(self, t):
         
         evaluate_model = "global"
-        test_accs, test_losses, precisions, recalls, f1s, cms = self.test_error_and_loss(evaluate_model)
+        test_accs, test_losses, precisions, recalls, f1s, cms = self.test_error_and_loss(evaluate_model, t)
         train_accs, train_losses  = self.train_error_and_loss(evaluate_model)
         
         self.global_train_acc.append(statistics.mean(train_accs))
@@ -557,7 +635,7 @@ class Fedmem():
 
     def evaluate_clusterhead(self, t):
         evaluate_model = "cluster"
-        test_accs, test_losses, precisions, recalls, f1s, cms = self.test_error_and_loss(evaluate_model)
+        test_accs, test_losses, precisions, recalls, f1s, cms = self.test_error_and_loss(evaluate_model, t)
         train_accs, train_losses  = self.train_error_and_loss( evaluate_model)
         
         self.cluster_train_acc.append(statistics.mean(train_accs))
@@ -586,7 +664,7 @@ class Fedmem():
 
     def evaluate_localmodel(self, t):
         evaluate_model = "local"
-        test_accs, test_losses, precisions, recalls, f1s, cms = self.test_error_and_loss(evaluate_model)
+        test_accs, test_losses, precisions, recalls, f1s, cms = self.test_error_and_loss(evaluate_model,t)
         train_accs, train_losses  = self.train_error_and_loss(evaluate_model)
         
         self.local_train_acc.append(statistics.mean(train_accs))
@@ -702,7 +780,7 @@ class Fedmem():
         ax[1].set_xticks(range(0, self.num_glob_iters, int(self.num_glob_iters/5)))
         ax[1].legend(prop={"size":12})
         
-        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) +  "/" + str(self.target) + "/" + self.cluster_type  + "/" + str(self.num_users) + "/" +"plot/global"
+        directory_name = str(self.global_model_name) + "/" + str(self.algorithm) +  "/data_silo/" + str(self.target) + "/" + self.cluster_type  + "/" + str(self.num_users) + "/" +"plot/global"
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
         # If the directory does not exist, create it
@@ -724,7 +802,8 @@ class Fedmem():
 
     def train(self):
         loss = []
-        
+        if self.cluster_type == "apriori":
+            self.apriori_clusters()
         for t in trange(self.num_glob_iters, desc=f" exp no : {self.exp_no} cluster type : {self.cluster_type} number of clients: {self.num_users} Global Rounds :"):
             
             
@@ -732,8 +811,11 @@ class Fedmem():
                 self.send_global_parameters()
             else:
                 self.send_cluster_parameters()
-            
-            self.selected_users = self.select_users(t, int(self.num_users)).tolist()
+            if self.fix_client_every_GR == 1:
+                
+                self.selected_users = self.select_n_1_users(t, int(self.num_users)-1)
+            else:
+                self.selected_users = self.select_users(t, int(self.num_users)).tolist()
             list_user_id = []
             for user in self.selected_users:
                 list_user_id.append(user.id)
@@ -741,6 +823,7 @@ class Fedmem():
 
             for user in tqdm(self.selected_users, desc=f"total selected users {len(self.selected_users)}"):
                 clust_id = self.find_cluster_id(user.id)
+                print(f"clust_id : {clust_id}")
                 if clust_id is not None:
                     user.train(self.c[clust_id], t)
                 else:
@@ -752,13 +835,8 @@ class Fedmem():
                 clusters = self.spectral(similarity_matrix, self.n_clusters).tolist()
                 print(clusters)
                 self.combine_cluster_user(clusters)
+                self.save_clusters(t)
             
-            
-            elif self.cluster_type == "apriori":
-                self.apriori_clusters()
-                
-
-
             self.aggregate_clusterhead()
             self.global_update()
 
