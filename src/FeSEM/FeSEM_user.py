@@ -36,16 +36,25 @@ class User():
         # Load dataset
         features_folder = '/proj/sourasb-220503/FedMEM/dataset/r3_mem_ResNet50_features'
         if args.target == 10:
-            annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/'+ 'Client_ID_' + str(self.id) +'.csv'
+            annotations_file_train = '/proj/sourasb-220503/FedMEM/dataset/clients/data_silo/mem_s/' + str(100) + '/' + 'Client_ID_' + str(self.id) +'_training.csv'
+            annotations_file_test = '/proj/sourasb-220503/FedMEM/dataset/clients/data_silo/mem_s/' + str(100) + '/' + 'Client_ID_' + str(self.id) +'_validation.csv'
         else:
-            annotations_file = '/proj/sourasb-220503/FedMEM/dataset/clients/A1/'+ 'Client_ID_' + str(self.id) +'.csv'
-        print(annotations_file)
+            annotations_file_train = '/proj/sourasb-220503/FedMEM/dataset/clients/data_silo/A1/' + str(100) + '/'+ 'Client_ID_' + str(self.id) +'_training.csv'
+            annotations_file_test = '/proj/sourasb-220503/FedMEM/dataset/clients/data_silo/A1/' + str(100) + '/'+ 'Client_ID_' + str(self.id) +'_validation.csv'
         
+        print(annotations_file_train)
+        print(annotations_file_test)
+        
+        
+        train_dataset = FeatureDataset(features_folder, annotations_file_train)
+        val_dataset = FeatureDataset(features_folder, annotations_file_test)
 
-        dataset = FeatureDataset(features_folder, annotations_file)
+
+        # dataset = FeatureDataset(features_folder, annotations_file)
 
         # Split dataset into training and validation
-        train_dataset, val_dataset = train_test_split(dataset, test_size=0.25, random_state=self.exp_no)
+        # train_dataset, val_dataset = train_test_split(dataset, test_size=0.25, random_state=self.exp_no)
+        
         self.train_samples = len(train_dataset)
         self.test_samples = len(val_dataset)
 

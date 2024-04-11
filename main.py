@@ -1,5 +1,6 @@
 from src.Fedavg.FedAvgServer import FedAvg
 #from src.PerMFL.PerMFLServer import PerMFL
+from src.Fedmem_mm.FedMEMServer import Fedmem_mm
 from src.Fedmem.FedMEMServer import Fedmem
 from src.FedProx.FedProxServer import FedProx
 from src.pFedme.pFedme_server import pFedme
@@ -30,15 +31,8 @@ def main(args):
     print(current_directory)
     i = args.exp_start
     while i < args.times:
-        try:
-            if (args.model_name == "SimpleCNN"):
-                model = SimpleCNN().to(device)
-            elif(args.model_name == "AMemNetModel"):
-                model = AMemNetModel().to(device)
-            else:
-                model = ResNet50TL(args.target).to(device)
-        except ValueError:
-            raise ValueError("Wrong model selected")
+        if args.model_name == "ResNet50TL":
+            model = ResNet50TL(args.target).to(device)
         try:    
             if args.algorithm == "FedAvg":
                 server = FedAvg(device, model, args,i, current_directory)
@@ -50,6 +44,9 @@ def main(args):
                 server = Fedmem(device, model, args, i, current_directory)
             elif args.algorithm == "FeSEM":
                 server = FeSEM(device, model, args, i, current_directory)
+            elif args.algorithm == "Fedmem_mm":
+                server = Fedmem_mm(device, args, i, current_directory)
+            
             # elif args.algorithm == "DemLearn":
             #    server = DemLearn(device, args, i , current_directory)
             

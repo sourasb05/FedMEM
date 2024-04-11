@@ -32,9 +32,9 @@ class FeSEM():
         self.learning_rate = args.alpha
         self.algorithm = args.algorithm
         self.user_ids = args.user_ids
-        print(f"user ids : {self.user_ids}")
+        # print(f"user ids : {self.user_ids}")
         self.total_users = len(self.user_ids)
-        print(f"total users : {self.total_users}")
+        # print(f"total users : {self.total_users}")
         self.num_users = self.total_users * args.users_frac
         self.n_clusters = args.num_teams
         self.target = args.target
@@ -104,12 +104,12 @@ class FeSEM():
         self.local_f1score = []
 
 
-        for i in trange(self.total_users, desc="Data distribution to clients"):
+        for i in range(self.total_users):
             user = User(device, self.global_model, args, self.user_ids[i], exp_no, current_directory)
             self.users.append(user)
             self.total_train_samples += user.train_samples
 
-        print("Finished creating FedAvg server.")
+        print("Finished creating FedSEM server.")
 
     def initialize_weights(self, m):
         if isinstance(m, nn.Conv2d):
@@ -147,8 +147,9 @@ class FeSEM():
             for param in self.c[clust_id]:
                 param.data = torch.zeros_like(param.data)
             users = np.array(self.cluster_dict[clust_id])
-            print(f"len(users) : {len(users)}")
+            # print(f"len(users) : {len(users)}")
             if len(users != 0):
+                print("clust_id : {clust_id}")
                 for user in users:
                     self.add_parameters_clusters(user, 1/len(users), clust_id)
             
@@ -186,7 +187,7 @@ class FeSEM():
 
     def similarity_check(self):
         similarity_matrix = {}
-        for k in trange(self.n_clusters):
+        for k in range(self.n_clusters):
             if k not in similarity_matrix:
                 similarity_matrix[k] = []
             # print(f"similarity checking cluster{k}")
@@ -362,8 +363,8 @@ class FeSEM():
         print(f"Global Trainning Loss: {self.global_train_loss[t]}")
         print(f"Global test accurancy: {self.global_test_acc[t]}")
         print(f"Global test_loss: {self.global_test_loss[t]}")
-        print(f"Global Precision: {self.global_precision[t]}")
-        print(f"Global Recall: {self.global_recall[t]}")
+        # print(f"Global Precision: {self.global_precision[t]}")
+        # print(f"Global Recall: {self.global_recall[t]}")
         print(f"Global f1score: {self.global_f1score[t]}")
 
 
@@ -393,8 +394,8 @@ class FeSEM():
         print(f"Cluster Trainning Loss: {self.cluster_train_loss[t]}")
         print(f"Cluster test accurancy: {self.cluster_test_acc[t]}")
         print(f"Cluster test_loss: {self.cluster_test_loss[t]}")
-        print(f"Cluster Precision: {self.cluster_precision[t]}")
-        print(f"Cluster Recall: {self.cluster_recall[t]}")
+        # print(f"Cluster Precision: {self.cluster_precision[t]}")
+        # print(f"Cluster Recall: {self.cluster_recall[t]}")
         print(f"Cluster f1score: {self.cluster_f1score[t]}")
 
         """
@@ -567,7 +568,7 @@ class FeSEM():
             # input("pause")
             self.aggregate_clusterhead(r_ik_dict)
             
-            for clust_id in trange(self.n_clusters):
+            for clust_id in range(self.n_clusters):
                 users = np.array(self.cluster_dict[clust_id])
                 print(f"number of users {len(users)} in cluster : {clust_id}")
                 if len(users) != 0:

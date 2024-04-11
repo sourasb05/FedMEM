@@ -144,11 +144,10 @@ class Fedmem_user():
         Optimizer
         """
         # self.optimizer = torch.optim.SGD(self.local_model.parameters(), lr=bb_step)
-        # self.optimizer = torch.optim.SGD([{'params': self.local_model.fc1.parameters()},
-        #                                    {'params': self.local_model.fc2.parameters()}
-        #                                ], lr=self.learning_rate, weight_decay=0.001)  # Only optimize the last layer
+        self.optimizer = torch.optim.SGD([{'params': self.local_model.fc1.parameters()},{'params': self.local_model.fc2.parameters()}
+                                        ], lr=self.learning_rate, weight_decay=0.001)  # Only optimize the last layer
 
-        self.optimizer = Fedmem(self.local_model.parameters(), self.learning_rate, self.eta)
+        #self.optimizer = Fedmem(self.local_model.parameters(), self.learning_rate, self.eta)
 
 
     #def bb_step(optimizer, grad, step_size):
@@ -175,7 +174,7 @@ class Fedmem_user():
             param.data = new_param.data.clone()
 
 
-    def test(self, global_model):
+    def test(self, global_model, t):
         # Set the model to evaluation mode
         self.eval_model.eval()
         self.update_parameters(global_model)
@@ -205,7 +204,21 @@ class Fedmem_user():
         precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
         recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
         f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
-        cm = confusion_matrix(y_true,y_pred)         
+        cm = confusion_matrix(y_true,y_pred)  
+        
+        file_cm = "cm_user_" + str(self.id) + "_GR_" + str(t)
+        #print(file)
+       
+        directory_name = "global" 
+        cm_df = pd.DataFrame(cm)
+
+        if not os.path.exists(self.current_directory + "/results/confusion_matrix/"+ directory_name):
+        # If the directory does not exist, create it
+            os.makedirs(self.current_directory + "/results/confusion_matrix/"+ directory_name)
+        
+        cm_df.to_csv(self.current_directory + "/results/confusion_matrix/"+ directory_name + "/" + file_cm + ".csv", index=False)
+
+        # print(f"local model saved at global round :{t} local round :{iter}")       
         return accuracy, validation_loss, precision, recall, f1, cm
 
     def test_local(self, t):
@@ -406,7 +419,7 @@ class Fedmem_user():
                 outputs = self.local_model(inputs)
                 loss = self.loss(outputs, labels)              
                 loss.backward()
-                self.optimizer.step(cluster_model)
+                self.optimizer.step()
                 running_loss += loss.item()
-            self.evaluate_model(epoch, t)
+            # self.evaluate_model(epoch, t)
             

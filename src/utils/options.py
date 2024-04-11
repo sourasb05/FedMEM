@@ -28,7 +28,7 @@ def args_parser():
     parser.add_argument("--eta", type=float, default=0.01, 
                         help="personalization parameter for Fedmem")
     
-    parser.add_argument("--num_global_iters", type=int, default=5)
+    parser.add_argument("--num_global_iters", type=int, default=20)
     parser.add_argument("--num_team_iters", type=int, default=10)
     parser.add_argument("--local_iters", type=int, default=10)
     parser.add_argument("--optimizer", type=str, default="SGD")
@@ -40,7 +40,7 @@ def args_parser():
     parser.add_argument("--gpu", type=int, default=0,
                         help="Which GPU to run the experiments, -1 mean CPU, 0,1,2 for GPU")
     
-    parser.add_argument("--users_frac", type=float, default=0.2, 
+    parser.add_argument("--users_frac", type=float, default=1.0, 
                         help="selected fraction of users available per global round")
     parser.add_argument("--total_users", type=int, default=40, 
                         help="total participants")
@@ -50,11 +50,11 @@ def args_parser():
                         help="Number of teams")
     parser.add_argument("--p_teams", type=int, default=1,
                         help="number of team selected per global round")
-    parser.add_argument("--cluster", type = str, default="dynamic", choices=["apriori", "dynamic", "random"])
+    parser.add_argument("--cluster", type = str, default="dynamic", choices=["apriori_hsgd", "dynamic", "random"])
     parser.add_argument("--target", type=int, default=10, choices=[3,10], help="number of target classes")
 
     parser.add_argument("--fixed_user_id", type=int, default=16)
-    parser.add_argument("--fix_client_every_GR", type=int, default=1, choices=[0,1])
+    parser.add_argument("--fix_client_every_GR", type=int, default=0, choices=[0,1])
     args = parser.parse_args()
 
     return args

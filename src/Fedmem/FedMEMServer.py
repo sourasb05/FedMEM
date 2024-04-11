@@ -408,7 +408,7 @@ class Fedmem():
        
         # directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/data_silo_" + str(self.data_silo) + "/" + "target_" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" "h5"
         
-        directory_name = "fixed_client_" + str(self.fixed_user.id) + "/target_" + str(self.target)
+        directory_name = "fixed_client_" + str(self.fixed_user.id) + "/target_" + str(self.target)+  "/" + self.cluster_type
 
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
@@ -533,7 +533,7 @@ class Fedmem():
         cms = []
         if evaluate_model == 'global':
             for c in self.selected_users:
-                accuracy, loss, precision, recall, f1, cm = c.test(self.global_model.parameters())
+                accuracy, loss, precision, recall, f1, cm = c.test(self.global_model.parameters(), t)
                
                 accs.append(accuracy)
                 losses.append(loss)
@@ -802,7 +802,7 @@ class Fedmem():
 
     def train(self):
         loss = []
-        if self.cluster_type == "apriori":
+        if self.cluster_type == "apriori_hsgd":
             self.apriori_clusters()
         for t in trange(self.num_glob_iters, desc=f" exp no : {self.exp_no} cluster type : {self.cluster_type} number of clients: {self.num_users} Global Rounds :"):
             
@@ -835,17 +835,17 @@ class Fedmem():
                 clusters = self.spectral(similarity_matrix, self.n_clusters).tolist()
                 print(clusters)
                 self.combine_cluster_user(clusters)
-                self.save_clusters(t)
+                # self.save_clusters(t)
             
             self.aggregate_clusterhead()
             self.global_update()
 
         
-            self.evaluate_localmodel(t)
-            self.evaluate_clusterhead(t)
+            # self.evaluate_localmodel(t)
+            # self.evaluate_clusterhead(t)
             self.evaluate(t)
 
-        self.save_results()
+        # self.save_results()
         # self.plot_per_result()
         # self.plot_cluster_result()
         # self.plot_global_result()

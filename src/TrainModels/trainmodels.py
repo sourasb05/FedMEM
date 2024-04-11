@@ -32,28 +32,75 @@ class ResNet50TL(nn.Module):
         x = self.relu(x)
         return x
 
+#==============================
 
-class SimpleCNN(nn.Module):
+class ResNet50FC(nn.Module):
+
     def __init__(self):
-        super(SimpleCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 16, 2, 1)
-        self.conv2 = nn.Conv2d(16, 32, 2, 1)
-        self.fc1 = nn.Linear(18432, 128)
-        self.fc2 = nn.Linear(128, 10)
-
+        super(ResNet50FC, self).__init__() 
+        resnet = torchvision.models.resnet50(pretrained=True)
+        self.avgpool = nn.Sequential(list(resnet.children())[-2])
+        # Define linear layers and ReLU activation
+        self.fc1 = nn.Linear(2048, 512)  # Assuming the output of avgpool is [batch_size, 2048, 1, 1]
+        self.dropout = nn.Dropout(0.5)  # Dropout p=0.5
+        self.batchnorm1 = nn.BatchNorm1d(512)
+        self.relu = nn.ReLU()
+        
     def forward(self, x):
-        x = self.conv1(x)
-        x = nn.ReLU()(x)
-        x = nn.MaxPool2d(2, 1)(x)
-        x = self.conv2(x)
-        x = nn.ReLU()(x)
-        x = nn.MaxPool2d(2, 1)(x)
-        x = torch.flatten(x, 1)
-        x = self.fc1(x)
-        x = nn.ReLU()(x)
-        x = self.fc2(x)
-        output = F.log_softmax(x, dim=1)
-        return output
+        features_1d = self.avgpool(x)
+        features_1d = torch.flatten(features_1d, 1)  # Flatten the features
+        x = self.fc1(features_1d)
+        x = self.dropout(x)
+        x = self.batchnorm1(x)
+        x = self.relu(x)
+        return x
+
+
+
+class CEMNet(nn.Module):
+    def __init__(self,n_class, mlp_input_size, mlp_hidden_size, mlp_output_size, id):
+        super(CEMNet, self).__init__()
+        # Initialize the ResNet50TL model for image feature extraction
+        self.cnn = ResNet50FC()
+        """
+        load the best client model.
+        """
+        
+        self.cnn.eval()
+        # Define MLP for contextual information
+        self.mlp = nn.Sequential(
+            nn.Linear(mlp_input_size, mlp_hidden_size),
+            nn.ReLU(),
+            nn.Linear(mlp_hidden_size, mlp_hidden_size),
+            nn.Sigmoid(),
+            nn.Linear(mlp_hidden_size, mlp_output_size),
+            nn.Softmax(dim=1),
+        )
+
+        # Define FC Layer after concatenation
+        # Assuming n_class is the output size from CNN, and mlp_output_size is the output size from MLP
+        self.fc = nn.Linear(512 + mlp_output_size, n_class)  # Assuming the final score is a single scalar
+
+    def forward(self, image, context_info):
+        # Forward pass through CNN
+        image_features = self.cnn(image)
+        # print(image_features)
+        # Forward pass through MLP
+        context_features = self.mlp(context_info)
+
+        # Concatenate features
+        combined_features = torch.cat((image_features, context_features), dim=1)
+
+        # Forward pass through final FC layer to get the event memory score
+        event_memory_score = self.fc(combined_features)
+
+        return event_memory_score
+
+
+
+
+
+
 
 #==============================================================
 
