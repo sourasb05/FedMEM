@@ -7,7 +7,7 @@ from torchvision import transforms
 from torchvision.models import resnet50
 import torchvision.models as models
 import torchvision.transforms as transforms
-from src.TrainModels.trainmodels import *
+from src.TrainModels.trainmodels import CEMNet
 from PIL import Image
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, confusion_matrix
 import os
@@ -15,11 +15,10 @@ import glob
 import copy
 import pandas as pd
 import numpy as np
-from src.Optimizer.Optimizer import Fedmem
 from src.utils.data_process import FeatureDataset_mm
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
-
+import h5py
 class Fedmem_user():
 
     def __init__(self,device, args, id, exp_no, current_directory):
@@ -37,6 +36,8 @@ class Fedmem_user():
         self.local_iters = args.local_iters
         self.target = args.target
         self.num_users = args.total_users * args.users_frac 
+        self.cluster = args.cluster
+        self.algorithm = args.algorithm
         """
         DataLoaders
         """
@@ -74,18 +75,29 @@ class Fedmem_user():
         self.test_loader = DataLoader(self.test_dataset, batch_size=len(self.test_dataset), shuffle=False)
 
         
-        self.trainloaderfull = DataLoader(self.train_dataset, self.train_samples)
+        self.trainloaderfull = DataLoader(self.train_dataset, self.train_samples, shuffle=False)
         
+        # checkpoint_path = self.current_directory + '/models/Cemnet16/ResNet50TL/Fedmem/data_silo_100/target_10/dynamic/40.0/0/per_model_user_' + str(self.id) + '.pt'
         
+       # checkpoint_path = self.current_directory + '/models/ResNet50TL/Fedmem/data_silo_100/target_10/' + self.cluster + '/40.0/0/' + 'per_model_user_' + str(self.id) + '.pt'
+        # checkpoint_path = self.current_directory + '/models/ResNet50TL/Fedmem/apriori/local_models/' + 'per_model_user_' + str(self.id) + '.pt'
+      #  checkpoint_path = self.current_directory + '/models/ResNet50TL/FedProx/global_model/' + 'server_' + '.pt'
+        
+        # checkpoint_path = self.current_directory + '/models/ResNet50TL/FedAvg/global_model/exp_0/_exp_no_0_GR_28.pt'
+        # checkpoint_path = self.current_directory + '/models/ResNet50TL/pFedme/10/40.0/global_model/exp_0/_exp_no_0_model.pt'
+        checkpoint_path = self.current_directory + '/models/ResNet50TL/Fedmem/data_silo_100/target_10/apriori_hsgd/40.0/h5/exp_0/_exp_no_0_model.pt'
+      
 
-        # those parameters are for persionalized federated learing.
-        
-        self.local_model =  CEMNet(n_class=args.target,
+        """ self.local_model =  CEMNet(n_class=args.target,
                             mlp_input_size=args.mlp_input_size, 
                             mlp_hidden_size=args.mlp_hidden_size, 
                             mlp_output_size=args.mlp_output_size,
-                            id=self.id).to(device)
-        
+                            checkpoint_path=checkpoint_path).to(device)
+        """
+        self.local_model = torch.load(checkpoint_path)
+
+        print(self.local_model)
+        input("press")
         self.best_local_model = copy.deepcopy(self.local_model)
         self.best_local_model.to(self.device)
         # print(self.local_model)
@@ -93,19 +105,28 @@ class Fedmem_user():
 
         # Freeze all layers
         # print(self.local_model)
-        for param in self.local_model.parameters():
+        """for param in self.local_model.parameters():
             param.requires_grad = False
 
-        # Unfreeze the last layer
-        for param in self.local_model.fc.parameters():
+        # Unfreeze the second last layer
+        for param in self.local_model.fc1.parameters():
             param.requires_grad = True
+
+        # Unfreeze the last layer
+        for param in self.local_model.fc2.parameters():
+            param.requires_grad = True
+        
+        # Unfreeze the last layer of cemnet
+        for param in self.local_model.fc.parameters():
+            param.requires_grad = True"""
+
+
 
         """
         Loss
         """
 
-        # self.loss = nn.CrossEntropyLoss()
-        self.loss = nn.MSELoss() 
+        self.loss = nn.CrossEntropyLoss()
         self.minimum_loss = 0.0
         self.maximum_per_accuracy = 0.0
         self.maximum_per_f1 = 0.0
@@ -117,71 +138,10 @@ class Fedmem_user():
         """
         Optimizer
         """
-        # self.optimizer = torch.optim.SGD(self.local_model.parameters(), lr=bb_step)
-        # self.optimizer = torch.optim.SGD([{'params': self.local_model.fc1.parameters()},
-        #                                    {'params': self.local_model.fc2.parameters()}
-        #                                ], lr=self.learning_rate, weight_decay=0.001)  # Only optimize the last layer
-
-        self.optimizer = Fedmem(self.local_model.parameters(), self.learning_rate, self.eta)
-
-
-    #def bb_step(optimizer, grad, step_size):
-
-    def set_parameters(self, cluster_model):
-        for param, glob_param in zip(self.local_model.parameters(), cluster_model):
-            param.data = glob_param.data.clone()
-            # print(f"user {self.id} parameters : {param.data}")
-        # input("press")
-            
-    def get_parameters(self):
-        return self.local_model.parameters()
-
-    def clone_model_paramenter(self, param, clone_param):
-        for param, clone_param in zip(param, clone_param):
-            clone_param.data = param.data.clone()
-        return clone_param
-
-    def get_updated_parameters(self):
-        return self.local_weight_updated
-
-    def update_parameters(self, new_params):
-        for param, new_param in zip(self.eval_model.parameters(), new_params):
-            param.data = new_param.data.clone()
-
-
-    def test(self, global_model):
-        # Set the model to evaluation mode
-        self.eval_model.eval()
-        self.update_parameters(global_model)
-        y_true = []
-        y_pred = []
-        
-        total_loss = 0.0
-        with torch.no_grad():  # Inference mode, gradients not needed
-            for inputs, contexts, labels in self.test_loader:
-                inputs, contexts, labels = inputs.to(self.device), contexts.to(self.device), labels.to(self.device)
-                outputs = self.eval_model(inputs, contexts)
-                loss = self.loss(outputs, labels)
-                total_loss += loss.item()
-                _, predicted = torch.max(outputs.data, 1)
-                # total += labels.size(0)
-                # correct += (predicted == labels).sum().item()
-                y_true.extend(labels.cpu().numpy())  # Collect true labels
-                y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
-        # Convert collected labels to numpy arrays for metric calculation
-        y_true = np.array(y_true)
-        y_pred = np.array(y_pred)
-    
-        # Calculate metrics
-        accuracy = accuracy_score(y_true, y_pred)
-        validation_loss = total_loss / len(self.test_loader)
-        precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
-        recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
-        f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
-        cm = confusion_matrix(y_true,y_pred)         
-        return accuracy, validation_loss, precision, recall, f1, cm
-
-    def test_local(self, t):
+        # self.optimizer = torch.optim.SGD(self.local_model.parameters(), lr=self.learning_rate, momentum=0.9)
+        self.optimizer = torch.optim.Adam(self.local_model.parameters(), lr=0.001)
+   
+    def test_local(self):
         self.best_local_model.eval()
         loss = 0
     
@@ -193,7 +153,7 @@ class Fedmem_user():
             for inputs, contexts, labels in self.test_loader:
                 inputs, contexts, labels = inputs.to(self.device), contexts.to(self.device), labels.to(self.device)
                 outputs = self.best_local_model(inputs, contexts)
-                loss = self.loss(outputs, labels)
+                loss = self.loss(outputs.float(), labels.long())
                 total_loss += loss.item()
                 _, predicted = torch.max(outputs.data, 1)
                 # total += labels.size(0)
@@ -212,45 +172,10 @@ class Fedmem_user():
         recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
         f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
         cm = confusion_matrix(y_true,y_pred)
-        self.list_accuracy.append([accuracy, t])
-        self.list_f1.append([f1, t]) 
-        self.list_val_loss.append([validation_loss,t])       
-        return accuracy, validation_loss, precision, recall, f1, cm
-
-
-    def train_error_and_loss(self, global_model):
-      
-        # Set the model to evaluation mode
-        self.eval_model.eval()
-        self.update_parameters(global_model)
-        y_true = []
-        y_pred = []
-        
-        total_loss = 0.0
-        with torch.no_grad():  # Inference mode, gradients not needed
-            for inputs, contexts, labels in self.test_loader:
-                inputs, contexts, labels = inputs.to(self.device), contexts.to(self.device), labels.to(self.device)
-                outputs = self.eval_model(inputs, contexts)
-                loss = self.loss(outputs, labels)
-                total_loss += loss.item()
-                _, predicted = torch.max(outputs.data, 1)
-                # total += labels.size(0)
-                # correct += (predicted == labels).sum().item()
-                y_true.extend(labels.cpu().numpy())  # Collect true labels
-                y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
-
-        # Convert collected labels to numpy arrays for metric calculation
-        y_true = np.array(y_true)
-        y_pred = np.array(y_pred)
-    
-        # Calculate metrics
-        accuracy = accuracy_score(y_true, y_pred)
-        train_loss = total_loss / len(self.trainloaderfull)
-        # precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
-        # recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
-        # f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)  # Use 'macro' for unweighted
-                
-        return accuracy, train_loss
+        self.list_accuracy.append(accuracy)
+        self.list_f1.append(f1) 
+        self.list_val_loss.append(validation_loss)       
+        return accuracy, f1
 
     def train_error_and_loss_local(self):
         self.best_local_model.eval()
@@ -264,7 +189,7 @@ class Fedmem_user():
             for inputs, contexts, labels in self.test_loader:
                 inputs, contexts, labels = inputs.to(self.device), contexts.to(self.device), labels.to(self.device)
                 outputs = self.local_model(inputs, contexts)
-                loss = self.loss(outputs, labels)
+                loss = self.loss(outputs.float(), labels.long())
                 total_loss += loss.item()
                 _, predicted = torch.max(outputs.data, 1)
                 # total += labels.size(0)
@@ -285,16 +210,7 @@ class Fedmem_user():
                 
         return accuracy, train_loss
 
-    
-    def load_model(self):
-        model_path = os.path.join("models", self.dataset)
-        self.local_model = torch.load(os.path.join(model_path, "server" + ".pt"))
-
-    
-#    @staticmethod
-#    def model_exists():
-#        return os.path.exists(os.path.join("models", "server" + ".pt"))
-    def evaluate_model(self, epoch, t):
+    def evaluate_model(self):
         self.local_model.eval()  # Set the model to evaluation mode
         y_true = []
         y_pred = []
@@ -302,15 +218,63 @@ class Fedmem_user():
         with torch.no_grad():  # Inference mode, gradients not needed
             for inputs, contexts, labels in self.test_loader:
                 inputs, contexts, labels = inputs.to(self.device), contexts.to(self.device), labels.to(self.device)
-                outputs = self.local_model(inputs, contexts)
-                loss = self.loss(outputs, labels)
+                outputs = self.local_model(inputs)
+                probabilities = torch.nn.functional.softmax(outputs, dim=1)
+                confidence_scores, predicted_classes = torch.max(probabilities, dim=1)
+                print(f"confidence_score of lifelogger {self.id} of {len(confidence_scores)}/{self.test_samples}: {confidence_scores}" )
+                print(f"predicted_class of lifelogger {self.id} of {len(predicted_classes)}/{self.test_samples}: {predicted_classes}")
+                
+                test_confidence_scores_np = confidence_scores.cpu().numpy()
+                test_predicted_classes_np = predicted_classes.cpu().numpy()
+                extrinsic_test = self.current_directory + '/dataset/extrinsic_features/' + 'Client_ID_' + str(self.id) + '/' + 'Client_ID_' + str(self.id) +'_validation.csv'
+                df_test = pd.read_csv(extrinsic_test)
+                df_test['Condidence'] = test_confidence_scores_np
+                df_test['predicted_mem_s'] = test_predicted_classes_np
+                file_name = "Client_id_" + self.id + ".csv"
+                directory_path_test = self.current_directory + "/dataset/contexual/test/h-sgd" # + self.algorithm +  "/" +  self.cluster
+                file_path = os.path.join(directory_path_test, file_name )
+
+                if not os.path.exists(directory_path_test):
+                    os.makedirs(directory_path_test)
+                print(df_test)
+                df_test.to_csv(file_path, index=False)
+
+
+
+
+            for inputs, contexts, labels in self.trainloaderfull:
+                inputs, contexts, labels = inputs.to(self.device), contexts.to(self.device), labels.to(self.device)
+                outputs = self.local_model(inputs)
+                probabilities = torch.nn.functional.softmax(outputs, dim=1)
+                confidence_scores, predicted_classes = torch.max(probabilities, dim=1)
+                print(f"confidence_score of lifelogger {self.id} of {len(confidence_scores)}/{self.train_samples}: {confidence_scores}" )
+                print(f"predicted_class of lifelogger {self.id} of {len(predicted_classes)}/{self.train_samples}: {predicted_classes}")
+                
+                train_confidence_scores_np = confidence_scores.cpu().numpy()
+                train_predicted_classes_np = predicted_classes.cpu().numpy()
+                extriensic_train = self.current_directory + '/dataset/extrinsic_features/'  + 'Client_ID_' + str(self.id) + '/' +  'Client_ID_' + str(self.id) + '_training.csv'
+                df_train = pd.read_csv(extriensic_train)
+                df_train['Condidence'] = train_confidence_scores_np
+                df_train['predicted_mem_s'] = train_predicted_classes_np
+
+                directory_path_train = self.current_directory + "/dataset/contexual/train/h-sgd" # + self.algorithm + "/" + self.cluster
+                file_name = "Client_id_" + self.id + ".csv"
+                file_path = os.path.join(directory_path_train, file_name)
+
+                if not os.path.exists(directory_path_train):
+                    os.makedirs(directory_path_train)
+                
+                df_train.to_csv(file_path, index=False)
+
+
+
+                """loss = self.loss(outputs.float(), labels.long())
                 total_loss += loss.item()
                 _, predicted = torch.max(outputs.data, 1)
                 # total += labels.size(0)
                 # correct += (predicted == labels).sum().item()
                 y_true.extend(labels.cpu().numpy())  # Collect true labels
                 y_pred.extend(predicted.cpu().numpy())  # Collect predicted labels
-
         # Convert collected labels to numpy arrays for metric calculation
         y_true = np.array(y_true)
         y_pred = np.array(y_pred)
@@ -321,7 +285,11 @@ class Fedmem_user():
         # precision = precision_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
         # recall = recall_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
         f1 = f1_score(y_true, y_pred, average='weighted')  # Use 'macro' for unweighted
-        
+        print(f" Client {self.id} [Epoch {epoch}] Validation Accuracy : {accuracy} Validation Loss : {validation_loss}")
+
+        self.list_accuracy.append(accuracy)
+        self.list_val_loss.append(validation_loss)
+        self.list_f1.append(f1)
         if epoch == 0:
             self.maximum_per_accuracy = accuracy
             self.maximum_per_f1 = f1
@@ -329,7 +297,7 @@ class Fedmem_user():
                 best_param.data = param.data.clone()
             cm = confusion_matrix(y_true, y_pred)
             # print(f"new maximum personalized accuracy of client {self.id} found at global round {t} local epoch {epoch}")
-            self.save_local_model(epoch, cm, t)
+            self.save_local_model(cm)
         else:
             if accuracy > self.maximum_per_accuracy:
                 self.maximum_per_accuracy = accuracy
@@ -338,12 +306,13 @@ class Fedmem_user():
                 cm = confusion_matrix(y_true, y_pred)
                 for best_param, param in zip(self.best_local_model.parameters(), self.local_model.parameters()):
                     best_param.data = param.data.clone()
-                self.save_local_model(epoch, cm, t)
-                
-                
+                self.save_local_model(cm)
+        # self.save_local_result(accuracy, validation_loss, f1)
+        """
+    
         
     
-    def save_local_model(self, iter, cm, t):
+    def save_local_model(self, cm):
         cm_df = pd.DataFrame(cm)
         
         # file = "per_model_user"+ str(self.id) +"_exp_no_" + str(self.exp_no) + "_LR_" + str(iter) + "_GR_" + str(t) 
@@ -351,7 +320,7 @@ class Fedmem_user():
         file_cm = "cm_user_" + str(self.id)
         #print(file)
        
-        directory_name =  "fixed_client_" + str(self.fixed_user_id) + "/" + str(self.global_model_name) + "/" + str(self.algorithm) + "/data_silo_" + str(self.data_silo) + "/" + "target_" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" + str(self.exp_no)
+        directory_name =  "Cemnet/" + self.cluster 
 
         
         
@@ -368,28 +337,48 @@ class Fedmem_user():
 
         # print(f"local model saved at global round :{t} local round :{iter}")
 
-    def train(self, cluster_model, t):
+    def train(self):
 
-        for epoch in range(self.local_iters):  # Loop over the dataset multiple times
+        """for epoch in range(self.local_iters):  # Loop over the dataset multiple times
             self.local_model.train()
             running_loss = 0.0
-                
+            # print(f"self.local_model : {self.local_model}")
             for images, contexts, labels in self.train_loader:
                 images, contexts, labels = images.to(self.device), contexts.to(self.device), labels.to(self.device)
                 
-                # print(labels.min(), labels.max())  # Check the range of your labels
-                # assert labels.min() >= 0, "Labels contain negative values."
-                # assert labels.max() < self.target, "Labels contain values >= n_classes."
-                # labels = labels.long()
                 self.optimizer.zero_grad()  # Clear gradients
                 outputs = self.local_model(images, contexts)  # Forward pass
+                outputs = outputs.float()
+                labels = labels.long()
+                # print(outputs)
+                # print(labels)
                 loss = self.loss(outputs, labels)  # Compute loss
                 loss.backward()  # Backward pass
-                self.optimizer.step(cluster_model)  # Update weights
+                self.optimizer.step()  # Update weights
                 running_loss += loss.item()
-                
-            self.evaluate_model(epoch, t)
+                """
+        self.evaluate_model()
+        # self.save_local_result()
 
 
-            running_loss = 0.0
+    def save_local_result(self):
+    
+            file = "per_user_" + str(self.id)
+            print(file)
+        
+            directory_name =  "Cemnet/" + self.cluster + "/"
+
             
+            
+            # Check if the directory already exists
+            if not os.path.exists(self.current_directory + "/results/Fedmem_MM/"+ directory_name):
+            # If the directory does not exist, create it
+                os.makedirs(self.current_directory + "/results/Fedmem_MM/"+ directory_name)
+            
+            with h5py.File(self.current_directory + "/results/Fedmem_MM/" + directory_name + "/" + '{}.h5'.format(file), 'w') as hf:
+                
+                hf.create_dataset('per_test_accuracy', data=self.list_accuracy)
+                hf.create_dataset('per_val_loss', data=self.list_val_loss)
+                hf.create_dataset('per_f1', data=self.list_f1)
+
+                hf.close()

@@ -4,8 +4,8 @@ import argparse
 def args_parser():
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("--model_name", type=str, default="ResNet50TL", choices=["ResNet50TL"])
-    
+    parser.add_argument("--model_name", type=str, default="ResNet50TL", choices=["ResNet50TL", "cemnet"])
+    parser.add_argument("--contexual", type=int, default=1, choices=[0,1])
     parser.add_argument("--algorithm", type=str, default="Fedmem",
                         choices=["pFedme", "FedAvg", "Fedmem", "FeSEM", "FedProx"])
     parser.add_argument("--user_ids", type=list, default=['16','17','18','19','22','23','25','26','27',\
@@ -30,7 +30,7 @@ def args_parser():
     
     parser.add_argument("--num_global_iters", type=int, default=20)
     parser.add_argument("--num_team_iters", type=int, default=10)
-    parser.add_argument("--local_iters", type=int, default=10)
+    parser.add_argument("--local_iters", type=int, default=20)
     parser.add_argument("--optimizer", type=str, default="SGD")
     
     parser.add_argument("--times", type=int, default=1, 
@@ -50,11 +50,16 @@ def args_parser():
                         help="Number of teams")
     parser.add_argument("--p_teams", type=int, default=1,
                         help="number of team selected per global round")
-    parser.add_argument("--cluster", type = str, default="dynamic", choices=["apriori_hsgd", "dynamic", "random"])
+    parser.add_argument("--cluster", type = str, default="apriori", choices=["apriori_hsgd", "dynamic", "apriori"])
     parser.add_argument("--target", type=int, default=10, choices=[3,10], help="number of target classes")
 
     parser.add_argument("--fixed_user_id", type=int, default=16)
     parser.add_argument("--fix_client_every_GR", type=int, default=0, choices=[0,1])
+
+    parser.add_argument("--mlp_input_size", type=int, default=27)
+    parser.add_argument("--mlp_hidden_size", type=int, default=20)
+    parser.add_argument("--mlp_output_size", type=int, default=10)
+
     args = parser.parse_args()
 
     return args

@@ -31,7 +31,7 @@ class Fedmem_mm():
         self.exp_no = exp_no
         self.current_directory = current_directory
         self.algorithm = args.algorithm
-
+        self.cluster = args.cluster
         self.users = []
         self.selected_users = []
 
@@ -61,7 +61,7 @@ class Fedmem_mm():
        
         # directory_name = str(self.global_model_name) + "/" + str(self.algorithm) + "/data_silo_" + str(self.data_silo) + "/" + "target_" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" "h5"
         
-        directory_name = "Fedmem_MM"
+        directory_name = "Fedmem_MM_" + self.cluster
 
         # Check if the directory already exists
         if not os.path.exists(self.current_directory + "/results/"+ directory_name):
@@ -103,8 +103,8 @@ class Fedmem_mm():
             hf.close()
         
     def evaluate_localmodel(self):
-        test_accs, f1s, cms = self.test_error_and_loss()
-        
+        test_accs, f1s = self.test_error_and_loss()
+        print(f"test_accs : {test_accs} f1s : {f1s}")
         self.local_test_acc.append(statistics.mean(test_accs))
         self.local_f1score.append(statistics.mean(f1s))
 
@@ -117,26 +117,24 @@ class Fedmem_mm():
         # tot_correct = []
         accs = []
         f1s = []
-        for c in self.selected_users:
+        for c in self.users:
             accuracy, f1 = c.test_local()
+            print(f"accuracy {accuracy} , f1 {f1}")
             accs.append(accuracy)
             f1s.append(f1)
-                
-                    
-
-            
+           
         return accs, f1s
 
     
     def train(self):
-        self.selected_users = self.select_users(1, int(self.num_users)).tolist()
+        # self.selected_users = self.select_users(1, int(self.num_users)).tolist()
         list_user_id = []
-        for user in self.selected_users:
+        for user in self.users:   #self.selected_users:
             list_user_id.append(user.id)
-        print(f"selected users : {list_user_id}")
-        for user in tqdm(self.selected_users, desc=f"total selected users {len(self.selected_users)}"):
+        # print(f"selected users : {list_user_id}")
+        for user in tqdm(self.users, desc=f"total selected users {len(self.users)}"):
             user.train()
         
-        self.evaluate_localmodel()
-        self.save_results()
+        # self.evaluate_localmodel()
+        # self.save_results()
         

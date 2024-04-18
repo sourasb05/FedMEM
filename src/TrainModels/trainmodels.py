@@ -10,7 +10,7 @@ import numpy as np
 
 class ResNet50TL(nn.Module):
 
-    def __init__(self, n_class):
+    def __init__(self, n_class, fc2=True):
         super(ResNet50TL, self).__init__() 
         resnet = torchvision.models.resnet50(pretrained=True)
         self.avgpool = nn.Sequential(list(resnet.children())[-2])
@@ -58,14 +58,19 @@ class ResNet50FC(nn.Module):
 
 
 class CEMNet(nn.Module):
-    def __init__(self,n_class, mlp_input_size, mlp_hidden_size, mlp_output_size, id):
+    def __init__(self,n_class, mlp_input_size, mlp_hidden_size, mlp_output_size, checkpoint_path):
         super(CEMNet, self).__init__()
         # Initialize the ResNet50TL model for image feature extraction
-        self.cnn = ResNet50FC()
+        # self.cnn = ResNet50TL(n_class=n_class, fc2=False)
         """
         load the best client model.
         """
-        
+        if checkpoint_path:
+            self.cnn = torch.load(checkpoint_path)
+            if hasattr(self.cnn, 'fc2'):
+                delattr(self.cnn, 'fc2')
+       # print(self.cnn)
+       #  input("press")
         self.cnn.eval()
         # Define MLP for contextual information
         self.mlp = nn.Sequential(
@@ -83,9 +88,12 @@ class CEMNet(nn.Module):
 
     def forward(self, image, context_info):
         # Forward pass through CNN
+        # print(image)
+        # print(f"self.cnn : {self.cnn}")
         image_features = self.cnn(image)
         # print(image_features)
         # Forward pass through MLP
+        
         context_features = self.mlp(context_info)
 
         # Concatenate features

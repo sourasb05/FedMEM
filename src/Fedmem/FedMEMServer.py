@@ -841,9 +841,9 @@ class Fedmem():
             self.global_update()
 
         
-            # self.evaluate_localmodel(t)
+            self.evaluate_localmodel(t)
             # self.evaluate_clusterhead(t)
-            self.evaluate(t)
+            #self.evaluate(t)
 
         # self.save_results()
         # self.plot_per_result()

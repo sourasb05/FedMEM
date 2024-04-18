@@ -355,7 +355,7 @@ class pFedme_user():
         # If the directory does not exist, create it
             os.makedirs(self.current_directory + "/models/confusion_matrix/"+ directory_name)
         
-        torch.save(self.local_model,self.current_directory + "/models/"+ directory_name + "/" + file + ".pt")
+        torch.save(self.local_model.state_dict(),self.current_directory + "/models/"+ directory_name + "/" + file + ".pt")
         cm_df.to_csv(self.current_directory + "/models/confusion_matrix/"+ directory_name + "/" + file_cm + ".csv", index=False)
 
         # print(f"local model saved at global round :{t} local round :{iter}")

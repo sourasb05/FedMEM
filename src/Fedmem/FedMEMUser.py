@@ -389,7 +389,8 @@ class Fedmem_user():
         file_cm = "cm_user_" + str(self.id)
         #print(file)
        
-        directory_name =  "fixed_client_" + str(self.fixed_user_id) + "/" + str(self.global_model_name) + "/" + str(self.algorithm) + "/data_silo_" + str(self.data_silo) + "/" + "target_" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" + str(self.exp_no)
+        # directory_name =  "fixed_client_" + str(self.fixed_user_id) + "/" + str(self.global_model_name) + "/" + str(self.algorithm) + "/data_silo_" + str(self.data_silo) + "/" + "target_" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" + str(self.exp_no)
+        directory_name =  "Cemnet" + str(self.fixed_user_id) + "/" + str(self.global_model_name) + "/" + str(self.algorithm) + "/data_silo_" + str(self.data_silo) + "/" + "target_" + str(self.target) + "/" + str(self.cluster_type) + "/" + str(self.num_users) + "/" + str(self.exp_no)
 
         
         
@@ -401,7 +402,7 @@ class Fedmem_user():
         # If the directory does not exist, create it
             os.makedirs(self.current_directory + "/results/confusion_matrix/"+ directory_name)
         
-        torch.save(self.local_model,self.current_directory + "/models/"+ directory_name + "/" + file + ".pt")
+        torch.save(self.local_model.state_dict(),self.current_directory + "/models/"+ directory_name + "/" + file + ".pt")
         cm_df.to_csv(self.current_directory + "/results/confusion_matrix/"+ directory_name + "/" + file_cm + ".csv", index=False)
 
         # print(f"local model saved at global round :{t} local round :{iter}")
@@ -421,5 +422,5 @@ class Fedmem_user():
                 loss.backward()
                 self.optimizer.step()
                 running_loss += loss.item()
-            # self.evaluate_model(epoch, t)
+            self.evaluate_model(epoch, t)
             
