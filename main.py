@@ -40,11 +40,12 @@ def main(args):
                 server = FedProx(device, model, args,i, current_directory)
             elif args.algorithm == "pFedme":
                 server = pFedme(device, model, args, i, current_directory)
-            elif args.algorithm == "Fedmem":
+            elif args.algorithm == "Fedmem" and args.contexual == 0: 
                 server = Fedmem(device, model, args, i, current_directory)
             elif args.algorithm == "FeSEM":
                 server = FeSEM(device, model, args, i, current_directory)
-            elif args.algorithm == "Fedmem_mm":
+            elif args.algorithm == "Fedmem" and args.contexual == 1:
+                print("in Fedmem_mm")
                 server = Fedmem_mm(device, args, i, current_directory)
             
             # elif args.algorithm == "DemLearn":
