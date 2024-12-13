@@ -1,5 +1,0 @@
-Box no: x_left x_right y_top y_bottom
-Box 1: (372 466 443 609) 
-Box 2: (616 739 418 590) 
-Box 3: (797 851 526 583) 
-Box 4: (552 591 609 662) 

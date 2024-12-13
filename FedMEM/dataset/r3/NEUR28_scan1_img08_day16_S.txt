@@ -1,4 +1,0 @@
-Box no: x_left x_right y_top y_bottom
-Box 1: (341 362 701 727) 
-Box 2: (318 337 702 729) 
-Box 3: (400 413 718 736) 

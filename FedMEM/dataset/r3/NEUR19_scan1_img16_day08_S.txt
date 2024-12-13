@@ -1,4 +1,0 @@
-Box no: x_left x_right y_top y_bottom
-Box 1: (393 602 88 412) 
-Box 2: (768 792 73 108) 
-Box 3: (886 899 42 68) 

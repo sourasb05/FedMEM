@@ -1,3 +1,0 @@
-Box no: x_left x_right y_top y_bottom
-Box 1: (511 599 208 334) 
-Box 2: (800 823 570 599) 

@@ -1,4 +1,0 @@
-Box no: x_left x_right y_top y_bottom
-Box 1: (357 386 803 837) 
-Box 2: (720 741 832 860) 
-Box 3: (645 664 857 882) 
